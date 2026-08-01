@@ -1,0 +1,28 @@
+{
+  "format_version": "1.26.0",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "beatorini:market_vault",
+      "is_spawnable": false,
+      "is_summonable": true
+    },
+    "components": {
+      "minecraft:type_family": { "family": ["beatorini_market_vault"] },
+      "minecraft:inventory": {
+        "inventory_size": 27,
+        "container_type": "inventory"
+      },
+      "minecraft:persistent": {},
+      "minecraft:physics": { "has_gravity": false, "has_collision": false },
+      "minecraft:damage_sensor": {
+        "triggers": { "cause": "all", "deals_damage": "no" }
+      },
+      "minecraft:fire_immune": {},
+      "minecraft:pushable": {
+        "is_pushable": false,
+        "is_pushable_by_piston": false
+      },
+      "minecraft:collision_box": { "width": 0.01, "height": 0.01 }
+    }
+  }
+}

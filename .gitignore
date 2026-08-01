@@ -1,0 +1,12 @@
+# 本地 AI 辅助配置
+.agents/
+.codex/
+
+# 系统与编辑器临时文件
+Thumbs.db
+Desktop.ini
+*.log
+
+# Minecraft 常见临时文件
+*_history
+*.tmp
