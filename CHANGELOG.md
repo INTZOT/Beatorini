@@ -15,6 +15,7 @@
 - 金库维度 `island:vault` 注册（`dimensions.js`）。
 - **money 计分板自动创建**：`money.js` 启动时检测，不存在则自动创建 `money` 计分板，读取时亦有兜底。
 - **物品/实体显示名本地化**：市场物品名改用 `ItemTypes` / `BlockTypes` 的 `localizationKey`，怪物名改用 `EntityTypes` 的 `localizationKey`，由客户端按玩家语言翻译。
+- **进入游戏表单加入服务器公告与更新日志**：签到表单拆分为「服务器公告」与「服务器更新日志」两区块，公告含常用指令与市场解锁提示，更新日志同步最新改动（内容集中在 `signin.js` 常量中，便于后续维护）。
 
 ### 重构
 
