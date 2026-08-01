@@ -82,8 +82,8 @@ export function showSigninForm(player) {
   form.spacer();
   for (const line of SERVER_ANNOUNCEMENTS) {
     form.label(line);
+    form.spacer();
   }
-  form.spacer();
 
   // --- 服务器更新日志 ---
   form.label("§6§l【服务器更新日志】");
@@ -93,8 +93,8 @@ export function showSigninForm(player) {
     form.spacer();
     for (const line of entry.items) {
       form.label(line);
+      form.spacer();
     }
-    form.spacer();
   }
 
   let signed = false;

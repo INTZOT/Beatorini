@@ -151,14 +151,17 @@ export function showProficiencyMenu(player, backFn) {
     const levelText = level >= 100 ? "§6§lMAX" : `§eLV ${level}`;
     const xpText = level >= 100 ? "" : ` §7| XP: ${xp}/${needed}`;
     f = f.label(`${prof.icon} §f${prof.name} ${levelText}${xpText}`);
+    f = f.spacer();
     if (level < 100) {
       f = f.label(renderProgressBar(pct));
+      f = f.spacer();
     }
     const activeEffects = prof.effects.filter((e) => level >= e.level);
     if (activeEffects.length > 0) {
       f = f.label(
         "  §b效果: " + activeEffects.map((e) => e.label).join(" §7| ")
       );
+      f = f.spacer();
     }
     f = f.spacer();
   }
