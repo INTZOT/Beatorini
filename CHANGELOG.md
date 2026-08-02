@@ -26,6 +26,7 @@
   - 启动对账：金库容器 ↔ 市场清单核对，孤儿物品按类型+数量尽量救回，异常清单自动下架并提示卖家。
 - **常加载区域改用 ScriptAPI**：由 `/tickingarea` 命令切换为 `world.tickingAreaManager`，避开原版命令每世界 10 个区域的上限（每包另有 ticking 区块总数上限，创建前通过 `hasCapacity` 预检）。
 - **市场/怪物显示层移除中文映射表**：删除 `market.js` 中约 300 条 `ITEM_CN_NAMES` 硬编码表，改为本地化键 + RawText 客户端翻译；上架时保存 `itemKey` 快照，历史清单自动回退类型查询；不展示 `nameTag`，避免玩家用自定义命名混淆商品。
+- **大厅改用主世界**：不再注册 `island:void_0` 维度，`LOBBY_DIMENSION_ID` 指向 `minecraft:overworld`，大厅相关传送逻辑不变。
 
 ### 移除
 

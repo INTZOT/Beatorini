@@ -5,8 +5,9 @@
 // --- 维度配置 ---
 export const DIMENSION_NAMESPACE = "island";
 export const DIMENSION_COUNT = 256;
-export const LOBBY_DIMENSION_ID = `${DIMENSION_NAMESPACE}:void_0`;
 export const OVERWORLD_ID = "minecraft:overworld";
+// 大厅直接使用主世界，不再注册 island:void_0
+export const LOBBY_DIMENSION_ID = OVERWORLD_ID;
 
 // --- 动态属性 Key 前缀 ---
 export const BOUND_COUNTER_KEY = "island:bound_counter";
