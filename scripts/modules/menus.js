@@ -518,7 +518,6 @@ export function init() {
     "§etips: 输入 #join @<玩家名> 申请加入他人岛屿！",
     "§etips: 岛屿会定期刷新流浪商人哦~",
     "§etips: 别把岩浆变成黑曜石哦~(站在黑曜石上手持空桶右键可回收岩浆)",
-    "§etips: 建筑高度是 ±512 哦~",
     "§etips: 刷石机有概率生成矿物哦~",
   ];
 
@@ -631,11 +630,12 @@ export function init() {
       }, 20);
     }
 
-    // 玩家重连：若不在岛屿维度则传送至大厅
+    // 玩家重连：主世界玩家不做处理；其他非空岛维度玩家传送至大厅
     const boundIndex = getPlayerBoundIndex(player.id);
     if (
-      boundIndex === undefined ||
-      !player.dimension.id.startsWith(`${DIMENSION_NAMESPACE}:void_`)
+      player.dimension.id !== LOBBY_DIMENSION_ID &&
+      (boundIndex === undefined ||
+        !player.dimension.id.startsWith(`${DIMENSION_NAMESPACE}:void_`))
     ) {
       system.runTimeout(() => {
         try {
