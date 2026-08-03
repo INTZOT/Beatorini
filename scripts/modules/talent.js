@@ -258,7 +258,7 @@ function showTalentDetail(player, talentId, backFn) {
       setTalentLevel(pid, talent.id, newLevel);
       player.playSound("random.levelup");
       player.sendMessage(
-        `§a🎉 ${talent.name} 升级至 LV${newLevel}！当前效果: ${getEffectText(talent, newLevel)}`
+        `§a✔ ${talent.name} 升级至 LV${newLevel}！当前效果: ${getEffectText(talent, newLevel)}`
       );
       form.close();
       system.runTimeout(() => showTalentDetail(player, talent.id, backFn), 2);
