@@ -66,10 +66,6 @@ export function saveAchievement(playerId, itemType) {
   }
 }
 
-export function clearAchievements(playerId) {
-  world.setDynamicProperty(ACHIEVEMENT_PREFIX + playerId, undefined);
-}
-
 export function init() {
   // --- 成就检测（每10秒检查玩家背包） ---
   system.runInterval(() => {

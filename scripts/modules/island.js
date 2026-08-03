@@ -7,7 +7,6 @@ import {
 } from "@minecraft/server";
 import { CustomForm, ObservableNumber } from "@minecraft/server-ui";
 import { teleportPlayer } from "../lib/teleport.js";
-import { clearAchievements } from "./achievements.js";
 import { clearSignin } from "./signin.js";
 import { clearLavaStreak } from "./ore-gen.js";
 import {
@@ -506,7 +505,6 @@ function abandonIsland(player, islandIndex) {
   for (const memberId of members) {
     world.setDynamicProperty(PLAYER_BOUND_PREFIX + memberId, undefined);
     world.setDynamicProperty(JOIN_FLAG_PREFIX + memberId, undefined);
-    clearAchievements(memberId);
     clearSignin(memberId);
     clearLavaStreak(memberId);
 
@@ -571,7 +569,6 @@ function leaveIsland(player) {
   );
   setIslandMembers(boundIndex, members);
   world.setDynamicProperty(PLAYER_BOUND_PREFIX + player.id, undefined);
-  clearAchievements(player.id);
   clearSignin(player.id);
   clearLavaStreak(player.id);
 
@@ -767,7 +764,6 @@ function confirmKickMember(player, islandIndex, targetId, backFn) {
       );
       setIslandMembers(islandIndex, members);
       world.setDynamicProperty(PLAYER_BOUND_PREFIX + targetId, undefined);
-      clearAchievements(targetId);
       clearSignin(targetId);
       clearLavaStreak(targetId);
 
