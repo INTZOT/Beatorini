@@ -26,7 +26,8 @@ import {
   ISLAND_BOUNDARY_PREFIX,
   ISLAND_BOUNDARY_LIMIT,
   ISLAND_BOUNDARY_INITIAL,
-  ISLAND_RESET_DELAY_TICKS,
+  ISLAND_RESET_DELAY_MS,
+  ISLAND_RESET_SCHEDULE_PREFIX,
   MAX_ISLAND_MEMBERS,
 } from "./config.js";
 
@@ -1055,6 +1056,8 @@ function showAbandonConfirm(player, boundIndex, backFn) {
 // ============================================================
 
 export function init() {
+  restorePendingResets();
+
   world.afterEvents.playerPlaceBlock.subscribe((event) => {
     const player = event.player;
     if (!player) return;
@@ -1110,15 +1113,43 @@ export function init() {
 
 function scheduleIslandReset(index) {
   setIslandStatus(index, "cleaning");
-  system.runTimeout(() => {
-    performIslandReset(index).catch((e) => {
-      console.error(`[Island] Auto reset failed: ${e}`);
-      setIslandStatus(index, "dirty");
-      world.sendMessage(
-        `§c岛屿 #${index} 自动重置失败，已标记为待重置，请管理员人工处理`
-      );
-    });
-  }, ISLAND_RESET_DELAY_TICKS);
+  world.setDynamicProperty(
+    ISLAND_RESET_SCHEDULE_PREFIX + index,
+    Date.now() + ISLAND_RESET_DELAY_MS
+  );
+  system.runTimeout(
+    () => runIslandReset(index),
+    Math.max(1, Math.floor(ISLAND_RESET_DELAY_MS / 50))
+  );
+}
+
+function runIslandReset(index) {
+  performIslandReset(index).catch((e) => {
+    console.error(`[Island] Auto reset failed: ${e}`);
+    setIslandStatus(index, "dirty");
+    world.setDynamicProperty(ISLAND_RESET_SCHEDULE_PREFIX + index, undefined);
+    world.sendMessage(
+      `§c岛屿 #${index} 自动重置失败，已标记为待重置，请管理员人工处理`
+    );
+  });
+}
+
+/** 脚本重载后恢复被中断的重置倒计时 */
+function restorePendingResets() {
+  const total = getBoundCount();
+  for (let i = 1; i <= total; i++) {
+    if (getIslandStatus(i) !== "cleaning") continue;
+    const target = world.getDynamicProperty(ISLAND_RESET_SCHEDULE_PREFIX + i);
+    const remaining =
+      typeof target === "number" ? target - Date.now() : 0;
+    system.runTimeout(
+      () => runIslandReset(i),
+      remaining > 0 ? Math.max(1, Math.ceil(remaining / 50)) : 1
+    );
+    if (remaining <= 0) {
+      world.sendMessage(`§e岛屿 #${i} 重置倒计时已在重载期间结束，立即执行重置`);
+    }
+  }
 }
 
 async function performIslandReset(index) {
@@ -1132,6 +1163,7 @@ async function performIslandReset(index) {
   const y2 = Math.min(319, boundary.yMax);
   if (x1 > x2 || z1 > z2 || y1 > y2) {
     setIslandStatus(index, "dirty");
+    world.setDynamicProperty(ISLAND_RESET_SCHEDULE_PREFIX + index, undefined);
     return;
   }
 
@@ -1198,6 +1230,7 @@ async function performIslandReset(index) {
 
   // 边界重置，进入待确认状态（管理员人工兜底开放）
   resetIslandBoundary(index);
+  world.setDynamicProperty(ISLAND_RESET_SCHEDULE_PREFIX + index, undefined);
   setIslandStatus(index, "review");
   world.sendMessage(`§a岛屿 #${index} 自动重置完成，等待管理员确认开放`);
 }

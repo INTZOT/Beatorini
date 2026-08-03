@@ -33,7 +33,8 @@ export const ISLAND_BOUNDARY_INITIAL = {
   zMin: -8,
   zMax: 8,
 };
-export const ISLAND_RESET_DELAY_TICKS = 1200; // 放弃后 60 秒开始自动重置
+export const ISLAND_RESET_DELAY_MS = 60000; // 放弃后 60 秒开始自动重置
+export const ISLAND_RESET_SCHEDULE_PREFIX = "island:reset_at_"; // 重置计划目标时间戳（毫秒）
 
 // --- 称号 ---
 export const TITLE_PREFIX = "title_";
