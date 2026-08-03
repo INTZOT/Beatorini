@@ -1056,7 +1056,14 @@ function showAbandonConfirm(player, boundIndex, backFn) {
 // ============================================================
 
 export function init() {
-  restorePendingResets();
+  // world API 需在世界启动后可用：恢复被中断的重置倒计时
+  system.beforeEvents.startup.subscribe(() => {
+    try {
+      restorePendingResets();
+    } catch (e) {
+      console.error(`[Island] Restore pending resets failed: ${e}`);
+    }
+  });
 
   world.afterEvents.playerPlaceBlock.subscribe((event) => {
     const player = event.player;
