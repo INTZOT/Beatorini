@@ -349,6 +349,41 @@ export function init() {
       handleIsland(player);
       return;
     }
+    // 临时调试：强制更改岛屿状态（仅管理员，验证后移除）
+    if (event.message.startsWith("#islandstate ")) {
+      event.cancel = true;
+      try {
+        const held = player
+          .getComponent("equippable")
+          ?.getEquipment("Mainhand");
+        if (!held || held.typeId !== "minecraft:command_block_minecart") {
+          player.sendMessage("§c该命令仅限管理员使用（需手持命令方块矿车）");
+          return;
+        }
+      } catch (e) {
+        player.sendMessage("§c该命令仅限管理员使用（需手持命令方块矿车）");
+        return;
+      }
+      const parts = event.message.trim().split(/\s+/);
+      const index = parseInt(parts[1], 10);
+      const status = parts[2];
+      const VALID_STATES = ["active", "pending", "dirty", "cleaning", "review"];
+      if (
+        !Number.isInteger(index) ||
+        index < 1 ||
+        index > getBoundCount() ||
+        !VALID_STATES.includes(status)
+      ) {
+        player.sendMessage(
+          "§c用法: #islandstate <编号> <active|pending|dirty|cleaning|review>"
+        );
+        return;
+      }
+      setIslandStatus(index, status);
+      player.sendMessage(`§a岛屿 #${index} 状态已强制改为: ${status}`);
+      player.playSound("random.orb");
+      return;
+    }
     if (event.message === "#menu") {
       event.cancel = true;
       system.runTimeout(() => {

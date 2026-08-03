@@ -67,4 +67,5 @@
 
 ### 其他
 
+- 临时调试命令 `#islandstate <编号> <状态>`：管理员（手持命令方块矿车）可强制切换岛屿状态（active/pending/dirty/cleaning/review），仅用于调试，验证后移除。
 - 初始化 Git 仓库（`main` 分支），新增 `.gitignore`（忽略 `.agents/`、`.codex/`、临时文件等），完成首次提交。
