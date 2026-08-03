@@ -255,12 +255,14 @@ function showAdminMenu(player) {
     dirty: "§c",
     pending: "§b",
     cleaning: "§e",
+    review: "§d",
   };
   const STATUS_TEXT = {
     active: "使用中",
     dirty: "待重置",
     pending: "待绑定",
     cleaning: "清理中",
+    review: "待确认",
   };
 
   const form = new CustomForm(player, "管理员面板");
@@ -298,6 +300,16 @@ function showAdminMenu(player) {
         setIslandStatus(i, "pending");
         form.close();
         player.sendMessage(`§a岛屿 #${i} 已标记为待绑定`);
+        player.playSound("random.orb");
+      });
+    }
+
+    if (status === "review") {
+      form.spacer();
+      form.button(`确认开放岛屿 #${i}`, () => {
+        setIslandStatus(i, "pending");
+        form.close();
+        player.sendMessage(`§a岛屿 #${i} 已确认开放，可重新分配`);
         player.playSound("random.orb");
       });
     }

@@ -23,6 +23,17 @@ export const ISLAND_JOIN_REQ_PREFIX = "island:join_req_";
 export const ISLAND_VISIT_REQ_PREFIX = "island:visit_req_";
 export const ISLAND_NOTIFICATIONS_PREFIX = "island:notifications_";
 export const MAX_ISLAND_MEMBERS = 5;
+export const ISLAND_BOUNDARY_PREFIX = "island:boundary_"; // 岛屿动态边界（六极值 JSON）
+export const ISLAND_BOUNDARY_LIMIT = 256; // 单方向自动扩展上限（超出不扩展，重置不覆盖）
+export const ISLAND_BOUNDARY_INITIAL = {
+  xMin: -8,
+  xMax: 8,
+  yMin: 64,
+  yMax: 76,
+  zMin: -8,
+  zMax: 8,
+};
+export const ISLAND_RESET_DELAY_TICKS = 1200; // 放弃后 60 秒开始自动重置
 
 // --- 称号 ---
 export const TITLE_PREFIX = "title_";
