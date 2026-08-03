@@ -1190,13 +1190,6 @@ async function performIslandReset(index) {
     dim.runCommand("kill @e[type=!player]");
   } catch (e) {}
 
-  // 重载初始结构
-  try {
-    dim.runCommand(`structure load "island_base" -4 64 -4`);
-  } catch (e) {
-    console.warn(`[Island] 重载初始结构失败: ${e}`);
-  }
-
   // 边界重置，进入待确认状态（管理员人工兜底开放）
   resetIslandBoundary(index);
   setIslandStatus(index, "review");
