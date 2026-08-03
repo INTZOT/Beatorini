@@ -1054,8 +1054,6 @@ function showAbandonConfirm(player, boundIndex, backFn) {
 // 动态边界：记录玩家放置方块的最远范围（六极值，只增不减）
 // ============================================================
 
-const boundaryWarnCooldown = new Map();
-
 export function init() {
   world.afterEvents.playerPlaceBlock.subscribe((event) => {
     const player = event.player;
@@ -1069,18 +1067,11 @@ export function init() {
     const b = getIslandBoundary(boundIndex);
     const limit = ISLAND_BOUNDARY_LIMIT;
 
-    // 超出上限的放置不扩展边界，避免重置范围爆炸（放置本身仍允许）
+    // 超出上限的放置不扩展边界（静默处理，不打扰玩家），避免重置范围爆炸
     if (
       Math.max(Math.abs(x), Math.abs(z)) > limit ||
       Math.abs(y) > limit
     ) {
-      const lastWarn = boundaryWarnCooldown.get(player.id) ?? 0;
-      if (system.currentTick - lastWarn > 200) {
-        boundaryWarnCooldown.set(player.id, system.currentTick);
-        player.sendMessage(
-          `§e提示：该位置超出岛屿自动重置范围（±${limit}），重置时不会被清理`
-        );
-      }
       return;
     }
 
