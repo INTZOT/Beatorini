@@ -296,7 +296,9 @@ function applyTalentEffects(player, talent, level) {
     const endTick = startTick + seg.seconds * 20;
     if (tickInPeriod >= startTick && tickInPeriod < endTick) {
       const remain = endTick - tickInPeriod;
-      player.addEffect(seg.type, Math.max(21, remain), {
+      // 多给 15 tick 余量，避免调度抖动导致档位衔接出现真空；
+      // 切换窗口后由下一次检查用新档位效果直接覆盖（同效果类型会替换）。
+      player.addEffect(seg.type, remain + 15, {
         amplifier: seg.amplifier,
         showParticles: false,
       });
@@ -307,7 +309,7 @@ function applyTalentEffects(player, talent, level) {
 }
 
 export function init() {
-  // 每 1 秒检查一次覆盖窗口（周期 60 秒，20 tick 粒度）
+  // 每 0.5 秒检查一次覆盖窗口，配合 15 tick 余量保证档位无缝衔接
   system.runInterval(() => {
     for (const player of world.getPlayers()) {
       const pid = player.id;
@@ -319,7 +321,7 @@ export function init() {
         } catch (e) {}
       }
     }
-  }, 20);
+  }, 10);
 }
 
 export { showTalentMenu };
