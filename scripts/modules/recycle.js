@@ -1,4 +1,4 @@
-import { system } from "@minecraft/server";
+import { system, world } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
 import { countItem, removeItems } from "../lib/inventory.js";
 import { getPlayerMoney } from "./money.js";
@@ -83,7 +83,7 @@ function getRecycleCum(player, typeId) {
     if (!raw) return 0;
     const data = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (data.date !== getTodayStr()) return 0;
-    return data.counts?.[typeId] ?? 0;
+    return data.gold?.[typeId] ?? 0;
   } catch (e) {
     return 0;
   }
@@ -100,9 +100,9 @@ function addRecycleCum(player, typeId, amount) {
       } catch (e) {}
     }
     if (!data || data.date !== today) {
-      data = { date: today, counts: {} };
+      data = { date: today, gold: {} };
     }
-    data.counts[typeId] = (data.counts[typeId] ?? 0) + amount;
+    data.gold[typeId] = (data.gold[typeId] ?? 0) + amount;
     world.setDynamicProperty(
       RECYCLE_CUM_PREFIX + player.id,
       JSON.stringify(data)
