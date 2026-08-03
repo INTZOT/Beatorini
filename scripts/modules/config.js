@@ -39,9 +39,12 @@ export const STATS_MINED_PREFIX = "stats:mined_";
 export const STATS_PLACED_PREFIX = "stats:placed_";
 export const STATS_DEATHS_PREFIX = "stats:deaths_";
 
-// --- 熟练度 ---
-export const PROFICIENCY_PREFIX = "prof:";
-export const PROFICIENCY_XP_PREFIX = "prof_xp:";
+// --- 天赋 ---
+export const TALENT_PREFIX = "talent:lv_";
+export const TALENT_MAX_LEVEL = 120;
+export const TALENT_PERIOD_TICKS = 1200; // 60 秒周期（20 tick/秒）
+export const TALENT_COST_BASE = 5000;
+export const TALENT_COST_GROWTH = 1.04;
 
 // --- 流浪商人 ---
 export const LAST_TRADER_DAY_PREFIX = "island:last_trader_day:";
@@ -60,9 +63,14 @@ export const TRANSFER_TAX_RATE = 0.05; // 转账税（由转出方额外支付�
 export const SIGNIN_BASE_REWARD = 2000; // 签到基础奖励
 export const SIGNIN_STREAK_REWARD = 500; // 每连续一天追加奖励
 export const SIGNIN_MAX_REWARD = 5000; // 签到奖励上限
-export const RECYCLE_DECAY_AMOUNT = 1000000; // 回收单价衰减基数（当日累计回收金额达到该值，单价减半）
-export const RECYCLE_MIN_FACTOR = 0.1; // 保底价格系数（基础价 × 该系数）
+export const RECYCLE_WINDOW = 150000; // 原价窗口：每种物品当日累计金币达到该值前保持原价
+export const RECYCLE_TAIL = 50000; // 超出窗口后指数衰减，价格归零前最多再赚的金币
+export const RECYCLE_DAILY_CAP = RECYCLE_WINDOW + RECYCLE_TAIL; // 每种物品当日收益上限
 export const RECYCLE_CUM_PREFIX = "recycle:cum_"; // 个人当日回收累计金额（按玩家存储 JSON）
+
+// --- 死亡惩罚 ---
+export const DEATH_PENALTY_BASE = 5000; // 死亡固定底价
+export const DEATH_PENALTY_RATE = 0.01; // 死亡净资产比例
 
 // --- 市场金库（自定义实体无损存储） ---
 export const MARKET_VAULT_DIM_ID = "island:vault";

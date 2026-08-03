@@ -1,5 +1,5 @@
 import { system, world, BlockPermutation } from "@minecraft/server";
-import { getProfLevel } from "./proficiency.js";
+import { getTalentLevel } from "./talent.js";
 
 // --- 矿石生成机制 ---
 const lavaMineStreaks = new Map();
@@ -80,8 +80,9 @@ export function init() {
     } else {
       currentChance = Math.min(baseChance + (streak - 79) * 0.0035, 1.0);
     }
-    const miningLevel = getProfLevel(playerId, "mining");
-    currentChance += miningLevel * 0.0005;
+    // 天赋系统替代熟练度：急迫天赋等级提供熔岩挖矿加成
+    const hasteLevel = getTalentLevel(playerId, "haste");
+    currentChance += hasteLevel * 0.0005;
 
     if (Math.random() >= currentChance) {
       streak++;

@@ -21,7 +21,7 @@ import {
 } from "./island.js";
 import { getAchievements, ACHIEVEMENTS } from "./achievements.js";
 import { showLeaderboardMenu } from "./leaderboard.js";
-import { showProficiencyMenu } from "./proficiency.js";
+import { showTalentMenu } from "./talent.js";
 import { showMarketMenu, showMarketUnlockForm, onPlayerJoin as marketOnPlayerJoin } from "./market.js";
 import { showRecycleCategoryMenu } from "./recycle.js";
 import { showSigninForm } from "./signin.js";
@@ -69,10 +69,10 @@ function showIslandMenu(player) {
       2
     );
   });
-  f = f.button("熟练度", () => {
+  f = f.button("天赋", () => {
     f.close();
     system.runTimeout(
-      () => showProficiencyMenu(player, showIslandMenu),
+      () => showTalentMenu(player, showIslandMenu),
       2
     );
   });

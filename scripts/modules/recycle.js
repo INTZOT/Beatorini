@@ -3,8 +3,9 @@ import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/serve
 import { countItem, removeItems } from "../lib/inventory.js";
 import { getPlayerMoney } from "./money.js";
 import {
-  RECYCLE_DECAY_AMOUNT,
-  RECYCLE_MIN_FACTOR,
+  RECYCLE_WINDOW,
+  RECYCLE_TAIL,
+  RECYCLE_DAILY_CAP,
   RECYCLE_CUM_PREFIX,
 } from "./config.js";
 
@@ -110,33 +111,35 @@ function addRecycleCum(player, typeId, amount) {
   } catch (e) {}
 }
 
-function getMinRecyclePrice(basePrice) {
-  return Math.max(1, Math.floor(basePrice * RECYCLE_MIN_FACTOR));
-}
-
 function getRecyclePrice(basePrice, cumAmount) {
-  const price = Math.floor(
-    (basePrice * RECYCLE_DECAY_AMOUNT) / (RECYCLE_DECAY_AMOUNT + cumAmount)
-  );
-  return Math.max(getMinRecyclePrice(basePrice), price);
+  // 原价窗口内保持基础价；超出后按指数陡降，价格归零前最多再赚 RECYCLE_TAIL
+  if (cumAmount >= RECYCLE_DAILY_CAP) return 0;
+  if (cumAmount < RECYCLE_WINDOW) return basePrice;
+  const K = RECYCLE_TAIL / Math.log(basePrice);
+  return Math.floor(basePrice * Math.exp(-(cumAmount - RECYCLE_WINDOW) / K));
 }
 
 function getRecyclePriceInfo(basePrice, cumAmount) {
   const price = getRecyclePrice(basePrice, cumAmount);
-  const minPrice = getMinRecyclePrice(basePrice);
+  const atFloor = price <= 0;
   let nextAmount = null;
   let nextPrice = null;
-  const atMin = price <= minPrice;
-  if (!atMin) {
-    // 单价首次低于当前价的最小累计金额 T：floor(P0*S/(S+T)) < price
-    nextAmount =
-      Math.floor((basePrice * RECYCLE_DECAY_AMOUNT) / price) -
-      RECYCLE_DECAY_AMOUNT +
-      1;
-    if (nextAmount <= cumAmount) nextAmount = cumAmount + 1;
-    nextPrice = getRecyclePrice(basePrice, nextAmount);
+  if (!atFloor) {
+    if (cumAmount < RECYCLE_WINDOW) {
+      nextAmount = RECYCLE_WINDOW + 1;
+    } else {
+      for (let t = cumAmount + 1; t <= RECYCLE_DAILY_CAP; t++) {
+        if (getRecyclePrice(basePrice, t) < price) {
+          nextAmount = t;
+          break;
+        }
+      }
+    }
+    if (nextAmount !== null) {
+      nextPrice = getRecyclePrice(basePrice, nextAmount);
+    }
   }
-  return { price, cumAmount, nextAmount, nextPrice, atMin };
+  return { price, cumAmount, nextAmount, nextPrice, atFloor };
 }
 
 // --- 二级菜单：回收类别 ---
@@ -170,7 +173,7 @@ function showRecycleCategory(player, catName, catData, backFn) {
   const countLabel = new ObservableString(`§7背包: ${countItem(player, item0.typeId)} 个`);
   const priceInfo0 = getRecyclePriceInfo(item0.price, getRecycleCum(player, item0.typeId));
   const priceLabel = new ObservableString(
-    `§e当前单价: ${priceInfo0.price} 金币/个  §8(今日已回收 ${priceInfo0.cumAmount} 金币)`
+    `§e当前单价: ${priceInfo0.price} 金币/个  §8(今日已回收 ${priceInfo0.cumAmount}/${RECYCLE_DAILY_CAP} 金币)`
   );
 
   selectedIdx.subscribe((idx) => {
@@ -178,11 +181,13 @@ function showRecycleCategory(player, catName, catData, backFn) {
     const owned = countItem(player, item.typeId);
     countLabel.setData(`§7背包: ${owned} 个`);
     const info = getRecyclePriceInfo(item.price, getRecycleCum(player, item.typeId));
-    let priceText = `§e当前单价: ${info.price} 金币/个  §8(今日已回收 ${info.cumAmount} 金币)`;
-    if (info.atMin) {
-      priceText += "  §8已到保底价";
+    let priceText = `§e当前单价: ${info.price} 金币/个  §8(今日已回收 ${info.cumAmount}/${RECYCLE_DAILY_CAP} 金币)`;
+    if (info.atFloor) {
+      priceText += "  §8已跌至谷底，今日不再回收";
     } else {
-      priceText += `  §8再回收约 ${info.nextAmount - info.cumAmount} 金币降至 ${info.nextPrice}`;
+      if (info.nextAmount !== null) {
+        priceText += `  §8再回收约 ${info.nextAmount - info.cumAmount} 金币降至 ${info.nextPrice} 金币`;
+      }
     }
     priceLabel.setData(priceText);
   });
@@ -215,9 +220,15 @@ function showRecycleCategory(player, catName, catData, backFn) {
         return;
       }
 
-      removeItems(player, item.typeId, qty);
       const cum = getRecycleCum(player, item.typeId);
       const price = getRecyclePrice(item.price, cum);
+      if (price <= 0) {
+        player.sendMessage(`§c${item.label.split(" -")[0]} 今日已跌至谷底，无法回收`);
+        player.playSound("random.break");
+        return;
+      }
+
+      removeItems(player, item.typeId, qty);
       const reward = price * qty;
       player.runCommand(`scoreboard players add @s money ${reward}`);
       addRecycleCum(player, item.typeId, reward);
@@ -226,11 +237,13 @@ function showRecycleCategory(player, catName, catData, backFn) {
       const newOwned = countItem(player, item.typeId);
       countLabel.setData(`§7背包: ${newOwned} 个`);
       const info = getRecyclePriceInfo(item.price, getRecycleCum(player, item.typeId));
-      let priceText = `§e当前单价: ${info.price} 金币/个  §8(今日已回收 ${info.cumAmount} 金币)`;
-      if (info.atMin) {
-        priceText += "  §8已到保底价";
+      let priceText = `§e当前单价: ${info.price} 金币/个  §8(今日已回收 ${info.cumAmount}/${RECYCLE_DAILY_CAP} 金币)`;
+      if (info.atFloor) {
+        priceText += "  §8已跌至谷底，今日不再回收";
       } else {
-        priceText += `  §8再回收约 ${info.nextAmount - info.cumAmount} 金币降至 ${info.nextPrice}`;
+        if (info.nextAmount !== null) {
+          priceText += `  §8再回收约 ${info.nextAmount - info.cumAmount} 金币降至 ${info.nextPrice} 金币`;
+        }
       }
       priceLabel.setData(priceText);
 
