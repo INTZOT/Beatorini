@@ -3,7 +3,7 @@ import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/serve
 import { countItem, removeItems, giveItemToPlayer } from "../lib/inventory.js";
 import { getPlayerMoney } from "./money.js";
 import { storeItem, takeItem, getVaultEntities } from "./vault.js";
-import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_VAULT_INDEX_KEY } from "./config.js";
+import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_VAULT_INDEX_KEY } from "./config.js";
 
 // ============================================================
 // 市场数据操作
@@ -230,6 +230,7 @@ function confirmMarketPurchase(player, listing, backFn) {
         buyer.sendMessage("§e背包已满，部分物品掉落在脚下");
       }
 
+      const sellerEarn = Math.floor(confirmed.price * (1 - MARKET_TAX_RATE));
       const sellerOnline = isPlayerOnline(confirmed.sellerId);
       if (sellerOnline) {
         const seller = [...world.getPlayers()].find(
@@ -238,7 +239,7 @@ function confirmMarketPurchase(player, listing, backFn) {
         if (seller) {
           try {
             seller.runCommand(
-              `scoreboard players add @s money ${confirmed.price}`
+              `scoreboard players add @s money ${sellerEarn}`
             );
           } catch (e) {}
           seller.sendMessage(
@@ -247,7 +248,7 @@ function confirmMarketPurchase(player, listing, backFn) {
                 { text: `§e市场：${buyerName} 购买了你的 §f` },
                 getListingDisplayName(confirmed),
                 {
-                  text: ` x${confirmed.amount} §e| 获得 ${confirmed.price}金币`,
+                  text: ` x${confirmed.amount} §e| 获得 ${sellerEarn}金币(税后)`,
                 },
               ],
             }
@@ -255,7 +256,7 @@ function confirmMarketPurchase(player, listing, backFn) {
           seller.playSound("random.orb");
         }
       } else {
-        addMarketSold(confirmed.sellerId, confirmed.price);
+        addMarketSold(confirmed.sellerId, sellerEarn);
       }
 
       buyer.sendMessage(

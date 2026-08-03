@@ -26,7 +26,7 @@ import { showMarketMenu, showMarketUnlockForm, onPlayerJoin as marketOnPlayerJoi
 import { showRecycleCategoryMenu } from "./recycle.js";
 import { showSigninForm } from "./signin.js";
 import { debugVault } from "./vault.js";
-import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX } from "./config.js";
+import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
 
 // ============================================================
 // 主菜单
@@ -190,18 +190,21 @@ function showTransferMoneyForm(player) {
     .spacer()
     .textField("转账金额", amountObs)
     .spacer()
+    .label(`§7转账手续费: ${Math.round(TRANSFER_TAX_RATE * 100)}%（由转出方支付）`)
+    .spacer()
     .button("确认转账", () => {
       const targetId = transferIdMap[selectedTarget.getData()];
       const amountStr = amountObs.getData().trim();
       const amount = parseInt(amountStr, 10);
+      const tax = Math.floor(amount * TRANSFER_TAX_RATE);
 
       if (isNaN(amount) || amount <= 0) {
         player.sendMessage("§c请输入有效金额！");
         return;
       }
-      if (amount > getPlayerMoney(player)) {
+      if (amount + tax > getPlayerMoney(player)) {
         player.sendMessage(
-          `§c金币不足！当前: ${getPlayerMoney(player)}，需转账: ${amount}`
+          `§c金币不足！当前: ${getPlayerMoney(player)}，需转账: ${amount}，手续费: ${tax}`
         );
         player.playSound("random.break");
         return;
@@ -215,10 +218,10 @@ function showTransferMoneyForm(player) {
         return;
       }
 
-      player.runCommand(`scoreboard players remove @s money ${amount}`);
+      player.runCommand(`scoreboard players remove @s money ${amount + tax}`);
       target.runCommand(`scoreboard players add @s money ${amount}`);
       player.sendMessage(
-        `§a成功转账 §e${amount} 金币 §a给 §e${target.name}`
+        `§a成功转账 §e${amount} 金币 §a给 §e${target.name} §7(手续费 ${tax})`
       );
       player.playSound("random.orb");
       target.sendMessage(

@@ -1,15 +1,19 @@
 import { system, world, ItemStack } from "@minecraft/server";
 import { CustomForm, ObservableString } from "@minecraft/server-ui";
-import { PLAYER_SIGNIN_DATE, PLAYER_SIGNIN_STREAK } from "./config.js";
+import {
+  PLAYER_SIGNIN_DATE,
+  PLAYER_SIGNIN_STREAK,
+  SIGNIN_BASE_REWARD,
+  SIGNIN_STREAK_REWARD,
+  SIGNIN_MAX_REWARD,
+} from "./config.js";
 
 // UTC+8 时区偏移
 const UTC8_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 // --- 进入表单的服务器公告 ---
 const SERVER_ANNOUNCEMENTS = [
-  "§e欢迎来到灯浮市Beatorini 空岛服务器！",
-  "§7常用指令：§f#island §7回岛  §f#lobby §7回大厅  §f#spawn §7设重生点",
-  "§7市场需 §f2000 金币 §7解锁，交易物品无损保留附魔/名称/耐久",
+  "§e欢迎来到灯浮市Beatorini 空岛服务器！"
 ];
 
 // --- 进入表单的服务器更新日志（最新在上） ---
@@ -66,7 +70,10 @@ export function showSigninForm(player) {
     streak = 0;
   }
 
-  const reward = Math.min(50 + streak * 10, 100);
+  const reward = Math.min(
+    SIGNIN_BASE_REWARD + streak * SIGNIN_STREAK_REWARD,
+    SIGNIN_MAX_REWARD
+  );
 
   const form = new CustomForm(player, "灯浮市Beatorini");
   const statusText = new ObservableString(

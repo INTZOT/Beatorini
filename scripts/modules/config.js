@@ -52,7 +52,18 @@ export const MARKET_SOLD_PREFIX = "market:sold_";
 export const MARKET_RETURNS_PREFIX = "market:returns_";
 export const MARKET_UNLOCKED_PREFIX = "market:unlocked_";
 export const MARKET_COUNTER_KEY = "market:counter";
-export const MARKET_UNLOCK_COST = 2000;
+export const MARKET_UNLOCK_COST = 200000;
+
+// --- 经济系统 ---
+export const MARKET_TAX_RATE = 0.05; // 市场交易税（成交时从卖家到账中扣除）
+export const TRANSFER_TAX_RATE = 0.05; // 转账税（由转出方额外支付）
+export const SIGNIN_BASE_REWARD = 2000; // 签到基础奖励
+export const SIGNIN_STREAK_REWARD = 500; // 每连续一天追加奖励
+export const SIGNIN_MAX_REWARD = 5000; // 签到奖励上限
+export const RECYCLE_TIER_SIZE = 100000; // 回收降价每档触发量（按物品当日个人累计）
+export const RECYCLE_PRICE_FACTOR = 0.6; // 每档价格系数（等比下降）
+export const RECYCLE_MIN_FACTOR = 0.2; // 保底价格系数（基础价 × 该系数）
+export const RECYCLE_CUM_PREFIX = "recycle:cum_"; // 个人当日回收累计（按玩家存储 JSON）
 
 // --- 市场金库（自定义实体无损存储） ---
 export const MARKET_VAULT_DIM_ID = "island:vault";
