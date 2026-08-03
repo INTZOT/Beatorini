@@ -1185,9 +1185,15 @@ async function performIslandReset(index) {
     }
   }
 
-  // 清除残留实体（保留玩家）
+  // 清除残留实体（仅限本岛屿维度，保留玩家）
   try {
-    dim.runCommand("kill @e[type=!player]");
+    for (const ent of dim.getEntities({
+      excludeTypes: ["minecraft:player"],
+    })) {
+      try {
+        ent.kill();
+      } catch (e) {}
+    }
   } catch (e) {}
 
   // 边界重置，进入待确认状态（管理员人工兜底开放）
