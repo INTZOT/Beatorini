@@ -1224,13 +1224,16 @@ async function performIslandReset(index) {
     }
   }
 
-  // 清除残留实体（仅限本岛屿维度，保留玩家）
+  // 清理残留实体（仅限本岛屿维度，保留玩家）：
+  // 传送到自身 xz 坐标、y=-104 的虚空，实体掉出世界自然移除，
+  // 避免 kill 触发掉落物生成或史莱姆分裂等残留
   try {
     for (const ent of dim.getEntities({
       excludeTypes: ["minecraft:player"],
     })) {
       try {
-        ent.kill();
+        const loc = ent.location;
+        ent.teleport({ x: loc.x, y: -104, z: loc.z });
       } catch (e) {}
     }
   } catch (e) {}
