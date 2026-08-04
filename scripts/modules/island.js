@@ -231,11 +231,11 @@ function teleportToIslandSafe(player, boundIndex) {
 // ============================================================
 
 export function handleLobby(player) {
-  system.runTimeout(() => {
+  system.runTimeout(async () => {
     try {
       // 离开岛屿前往大厅：背包/装备存入自己的岛屿储物柜（已在主世界则跳过）
       if (player.dimension.id !== LOBBY_DIMENSION_ID) {
-        stashPlayerInventory(player);
+        await stashPlayerInventory(player);
       }
       const lobby = world.getDimension(LOBBY_DIMENSION_ID);
       teleportPlayer(player, { x: 0, y: 0, z: 0 }, { dimension: lobby });
@@ -942,8 +942,8 @@ function showNotificationCenter(player, boundIndex, backFn) {
       removeNotification(boundIndex, item.sourceIdx);
       if (target) {
         // 访问他人岛屿前：背包/装备存入自己的岛屿储物柜
-        stashPlayerInventory(target);
-        system.runTimeout(() => {
+        system.runTimeout(async () => {
+          await stashPlayerInventory(target);
           try {
             teleportToIslandSafe(target, boundIndex);
           } catch (e) {
