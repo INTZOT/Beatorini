@@ -45,6 +45,7 @@ function enterSoul(player) {
     const originalMode = String(player.getGameMode()).toLowerCase();
     world.setDynamicProperty(SOUL_KEY + player.id, marker.id);
     active.set(player.id, {
+      player,
       marker,
       originalMode,
       fixedPos: marker.location,
