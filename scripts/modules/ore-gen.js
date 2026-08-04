@@ -84,6 +84,16 @@ export function init() {
     const hasteLevel = getTalentLevel(playerId, "haste");
     currentChance += hasteLevel * 0.0005;
 
+    // ActionBar：当前累计出矿概率 + 进度条（当前/最大 100%）
+    const pct = Math.round(Math.min(currentChance, 1) * 1000) / 10;
+    const ratio = Math.min(1, currentChance);
+    const filled = Math.round(ratio * 20);
+    const bar =
+      "§a" + "█".repeat(filled) + "§7" + "█".repeat(20 - filled);
+    player.onScreenDisplay.setActionBar(
+      `§e当前出矿概率: §f${pct}%  §8(最大 100%)\n${bar} §f${filled}/20`
+    );
+
     if (Math.random() >= currentChance) {
       streak++;
       lavaMineStreaks.set(playerId, streak);
