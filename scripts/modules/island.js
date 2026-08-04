@@ -229,7 +229,7 @@ export function handleLobby(player) {
   system.runTimeout(() => {
     try {
       const lobby = world.getDimension(LOBBY_DIMENSION_ID);
-      teleportPlayer(player, { x: 0, y: 0, z: 0 }, { dimension: lobby });
+      teleportPlayer(player, { x: 0.5, y: 0, z: 0.5 }, { dimension: lobby });
     } catch (e) {
       console.error(`[Lobby] Teleport failed: ${e}`);
       player.sendMessage("§c传送至大厅失败，请重试");
