@@ -48,6 +48,7 @@ function enterSoul(player) {
       player,
       marker,
       originalMode,
+      bodyPos: { x: loc.x, y: loc.y, z: loc.z },
       fixedPos: marker.location,
       dimensionId: player.dimension.id,
     });
@@ -81,19 +82,22 @@ function exitSoul(player, reason) {
   active.delete(player.id);
 
   const marker = world.getEntity(markerId);
-  if (marker) {
+  if (data?.bodyPos) {
+    // 优先传回进入出窍时的精确坐标
     try {
-      player.teleport(marker.location, { dimension: marker.dimension });
-      marker.remove();
-    } catch (e) {}
-  } else if (data) {
-    // 标记已失效：按记录位置兜底传送
-    try {
-      player.teleport(data.fixedPos, {
+      player.teleport(data.bodyPos, {
         dimension: world.getDimension(data.dimensionId),
       });
     } catch (e) {}
+  } else if (marker) {
+    // 无记录时退回标记位置
+    try {
+      player.teleport(marker.location, { dimension: marker.dimension });
+    } catch (e) {}
   }
+  try {
+    marker?.remove();
+  } catch (e) {}
 
   try {
     player.runCommand(`gamemode ${originalMode} @s`);
