@@ -34,7 +34,11 @@ function enterSoul(player) {
 
     const originalMode = String(player.getGameMode()).toLowerCase();
     world.setDynamicProperty(SOUL_KEY + player.id, marker.id);
-    active.set(player.id, { marker, originalMode });
+    active.set(player.id, {
+      marker,
+      originalMode,
+      fixedPos: marker.location,
+    });
     player.runCommand("gamemode spectator @s");
 
     player.sendMessage(
@@ -86,6 +90,18 @@ function restoreAfterReload(player) {
 }
 
 export function init() {
+  // 盔甲架钉回生成位置，等效不受重力影响（悬浮标记）
+  system.runInterval(() => {
+    for (const data of active.values()) {
+      const m = data.marker;
+      try {
+        if (m?.isValid()) {
+          m.teleport(data.fixedPos, { dimension: m.dimension });
+        }
+      } catch (e) {}
+    }
+  }, 2);
+
   // 脚本重载后恢复在线玩家
   world.afterEvents.worldLoad.subscribe(() => {
     for (const p of world.getPlayers()) {
