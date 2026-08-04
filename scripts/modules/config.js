@@ -35,6 +35,7 @@ export const ISLAND_BOUNDARY_INITIAL = {
 };
 export const ISLAND_RESET_DELAY_MS = 5000; // 放弃后 5 秒开始自动重置
 export const ISLAND_RESET_SCHEDULE_PREFIX = "island:reset_at_"; // 重置计划目标时间戳（毫秒）
+export const ISLAND_ABANDON_PREFIX = "island:abandon_date_"; // 玩家最近一次放弃岛屿的日期（每日限制）
 
 // --- 称号 ---
 export const TITLE_PREFIX = "title_";

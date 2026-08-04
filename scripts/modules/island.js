@@ -27,6 +27,7 @@ import {
   ISLAND_BOUNDARY_INITIAL,
   ISLAND_RESET_DELAY_MS,
   ISLAND_RESET_SCHEDULE_PREFIX,
+  ISLAND_ABANDON_PREFIX,
   MAX_ISLAND_MEMBERS,
 } from "./config.js";
 
@@ -501,7 +502,20 @@ function giveMenuClock(player) {
   } catch (e) {}
 }
 
+function getTodayStr() {
+  const d = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
 function abandonIsland(player, islandIndex) {
+  // 每日仅一次放弃机会，按 UTC+8 自然日刷新
+  const today = getTodayStr();
+  if (world.getDynamicProperty(ISLAND_ABANDON_PREFIX + player.id) === today) {
+    player.sendMessage("§c你今天已经放弃过一次岛屿，请明天再试");
+    player.playSound("random.break");
+    return;
+  }
+
   const members = getIslandMembers(islandIndex);
   const dimensionId = `${DIMENSION_NAMESPACE}:void_${islandIndex}`;
   const lobby = world.getDimension(LOBBY_DIMENSION_ID);
@@ -573,6 +587,7 @@ function abandonIsland(player, islandIndex) {
 
   player.sendMessage("§c岛屿已放弃，5 秒后自动重置，重置完成后等待管理员确认开放");
   player.playSound("random.break");
+  world.setDynamicProperty(ISLAND_ABANDON_PREFIX + player.id, today);
   world.sendMessage(`§c玩家 ${player.name} 放弃了岛屿 #${islandIndex}`);
 }
 
