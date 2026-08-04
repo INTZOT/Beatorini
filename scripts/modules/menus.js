@@ -22,7 +22,7 @@ import {
 import { getAchievements, ACHIEVEMENTS } from "./achievements.js";
 import { showLeaderboardMenu } from "./leaderboard.js";
 import { showTalentMenu } from "./talent.js";
-import { toggleSoul } from "./soul.js";
+import { toggleSoul, isSoulActive } from "./soul.js";
 import { showMarketMenu, showMarketUnlockForm, onPlayerJoin as marketOnPlayerJoin } from "./market.js";
 import { showRecycleCategoryMenu } from "./recycle.js";
 import { showSigninForm } from "./signin.js";
@@ -332,6 +332,17 @@ function getBoundCount() {
 export function init() {
   world.beforeEvents.chatSend.subscribe((event) => {
     const player = event.sender;
+
+    // 灵魂出窍中禁止使用其他命令（#fc off 除外）
+    if (
+      isSoulActive(player.id) &&
+      event.message.startsWith("#") &&
+      event.message !== "#fc off"
+    ) {
+      event.cancel = true;
+      player.sendMessage("§c灵魂出窍中无法使用其他命令，输入 #fc off 退出");
+      return;
+    }
 
     // #lobby
     if (event.message === "#lobby") {

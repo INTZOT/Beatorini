@@ -15,6 +15,9 @@
         "is_pushable": false,
         "is_pushable_by_piston": false
       },
+      "minecraft:damage_sensor": {
+        "triggers": { "cause": "all", "deals_damage": "no" }
+      },
       "minecraft:collision_box": { "width": 0.01, "height": 0.01 },
       "minecraft:health": { "value": 100, "max": 100 }
     }

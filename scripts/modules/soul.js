@@ -4,10 +4,16 @@
 // 出窍状态落盘（动态属性），脚本重载/玩家重连自动恢复。
 // ============================================================
 import { system, world } from "@minecraft/server";
+import { LOBBY_DIMENSION_ID } from "./config.js";
 
 const SOUL_KEY = "soul:active_";
 const SOUL_OWNER_KEY = "soul:owner";
+const SOUL_MAX_RANGE = 96; // 灵魂出窍活动半径
 const active = new Map(); // playerId -> { marker, originalMode }
+
+export function isSoulActive(playerId) {
+  return !!world.getDynamicProperty(SOUL_KEY + playerId);
+}
 
 export function toggleSoul(player, on) {
   if (on) {
@@ -18,6 +24,10 @@ export function toggleSoul(player, on) {
 }
 
 function enterSoul(player) {
+  if (player.dimension.id === LOBBY_DIMENSION_ID) {
+    player.sendMessage("§c主世界（大厅）不能开启灵魂出窍");
+    return;
+  }
   if (world.getDynamicProperty(SOUL_KEY + player.id)) {
     player.sendMessage("§c你已在灵魂出窍中");
     return;
@@ -98,6 +108,25 @@ function restoreAfterReload(player) {
 }
 
 export function init() {
+  // 灵魂出窍范围限制：超出 r96 拉回标记位置
+  system.runInterval(() => {
+    for (const data of active.values()) {
+      const p = data.player;
+      try {
+        const loc = p.location;
+        const dx = loc.x - data.fixedPos.x;
+        const dy = loc.y - data.fixedPos.y;
+        const dz = loc.z - data.fixedPos.z;
+        if (Math.sqrt(dx * dx + dy * dy + dz * dz) > SOUL_MAX_RANGE) {
+          p.teleport(data.fixedPos, {
+            dimension: world.getDimension(data.dimensionId),
+          });
+          p.sendMessage(`§c已到达灵魂出窍边界（r${SOUL_MAX_RANGE}），已拉回标记位置`);
+        }
+      } catch (e) {}
+    }
+  }, 5);
+
   // 脚本重载后恢复在线玩家
   world.afterEvents.worldLoad.subscribe(() => {
     for (const p of world.getPlayers()) {
@@ -111,21 +140,4 @@ export function init() {
     system.runTimeout(() => restoreAfterReload(p), 10);
   });
 
-  // 灵魂标记受到伤害时自动退出灵魂出窍
-  world.afterEvents.entityHurt.subscribe((event) => {
-    const ent = event.hurtEntity;
-    if (ent.typeId !== "beatorini:soul_marker") return;
-    const ownerId = ent.getDynamicProperty(SOUL_OWNER_KEY);
-    if (!ownerId) return;
-    const player = [...world.getPlayers()].find((p) => p.id === ownerId);
-    if (player) {
-      exitSoul(player, "身体标记受击");
-    } else {
-      world.setDynamicProperty(SOUL_KEY + ownerId, undefined);
-      active.delete(ownerId);
-      try {
-        ent.remove();
-      } catch (e) {}
-    }
-  });
 }
