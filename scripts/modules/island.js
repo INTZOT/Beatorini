@@ -10,11 +10,6 @@ import { teleportPlayer } from "../lib/teleport.js";
 import { clearSignin } from "./signin.js";
 import { clearLavaStreak } from "./ore-gen.js";
 import {
-  stashPlayerInventory,
-  unstashPlayerInventory,
-  clearLockerEntities,
-} from "./locker.js";
-import {
   DIMENSION_NAMESPACE,
   DIMENSION_COUNT,
   LOBBY_DIMENSION_ID,
@@ -231,12 +226,8 @@ function teleportToIslandSafe(player, boundIndex) {
 // ============================================================
 
 export function handleLobby(player) {
-  system.runTimeout(async () => {
+  system.runTimeout(() => {
     try {
-      // 离开岛屿前往大厅：背包/装备存入自己的岛屿储物柜（已在主世界则跳过）
-      if (player.dimension.id !== LOBBY_DIMENSION_ID) {
-        await stashPlayerInventory(player);
-      }
       const lobby = world.getDimension(LOBBY_DIMENSION_ID);
       teleportPlayer(player, { x: 0, y: 0, z: 0 }, { dimension: lobby });
     } catch (e) {
@@ -325,7 +316,6 @@ export function handleIsland(player) {
     system.runTimeout(() => {
       try {
         teleportToIslandSafe(player, boundIndex);
-        system.runTimeout(() => unstashPlayerInventory(player), 8);
         player.sendMessage("§a已将你传送回空岛！输入 #lobby 以返回大厅！");
         player.playSound("random.orb");
         try {
@@ -538,8 +528,6 @@ function abandonIsland(player, islandIndex) {
 
   // 解绑所有成员
   for (const memberId of members) {
-    // 先移除储物柜实体（此时成员仍绑定，可定位其岛屿维度）
-    clearLockerEntities(memberId);
     world.setDynamicProperty(PLAYER_BOUND_PREFIX + memberId, undefined);
     world.setDynamicProperty(JOIN_FLAG_PREFIX + memberId, undefined);
     clearSignin(memberId);
@@ -606,7 +594,6 @@ function leaveIsland(player) {
     (id) => id !== player.id
   );
   setIslandMembers(boundIndex, members);
-  clearLockerEntities(player.id);
   world.setDynamicProperty(PLAYER_BOUND_PREFIX + player.id, undefined);
   clearSignin(player.id);
   clearLavaStreak(player.id);
@@ -803,7 +790,6 @@ function confirmKickMember(player, islandIndex, targetId, backFn) {
         (id) => id !== targetId
       );
       setIslandMembers(islandIndex, members);
-      clearLockerEntities(targetId);
       world.setDynamicProperty(PLAYER_BOUND_PREFIX + targetId, undefined);
       clearSignin(targetId);
       clearLavaStreak(targetId);
@@ -955,9 +941,7 @@ function showNotificationCenter(player, boundIndex, backFn) {
       removeVisitRequest(boundIndex, item.playerId);
       removeNotification(boundIndex, item.sourceIdx);
       if (target) {
-        // 访问他人岛屿前：背包/装备存入自己的岛屿储物柜
-        system.runTimeout(async () => {
-          await stashPlayerInventory(target);
+        system.runTimeout(() => {
           try {
             teleportToIslandSafe(target, boundIndex);
           } catch (e) {
