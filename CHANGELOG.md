@@ -6,6 +6,7 @@
 
 ### 新增
 
+- **背包储物柜**（`scripts/modules/locker.js`）：玩家离开岛屿前往大厅或访问他人岛屿前，背包/快捷栏/盔甲/副手存入自己岛屿维度内的两个 27 格实体（复用 `beatorini:market_vault`，无损 `ItemStack`）；只有返回自己岛屿时才取回。大厅期间背包恒为空，大厅获得物品在取回时一律清空；放弃/离开/被踢出岛屿时同步移除储物柜实体防止物品残留；重置数据返回大厅后自动给予菜单时钟。
 - **市场金库自定义实体** `beatorini:market_vault`：27 格容器、持久化、无重力/无碰撞、免疫伤害与火焰、不可推动，用于无损存储交易物品。
 - **金库模块** `scripts/modules/vault.js`：
   - `storeItem` / `takeItem` / `peekItem` 直接读写实体容器，完整 `ItemStack` 进出，附魔、名称、Lore、耐久等 NBT 无损；
