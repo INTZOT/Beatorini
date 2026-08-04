@@ -302,12 +302,6 @@ export function handleIsland(player) {
       player.sendMessage("§c你的岛屿不可用，请稍后再试");
       return;
     }
-    // 已在自己的空岛上：不做传送与取回，避免误清空背包
-    if (player.dimension.id === `${DIMENSION_NAMESPACE}:void_${boundIndex}`) {
-      player.sendMessage("§a你已在空岛上！");
-      player.playSound("random.orb");
-      return;
-    }
     if (getIslandOwner(boundIndex) === undefined) {
       setIslandOwner(boundIndex, player.id);
       setIslandMembers(boundIndex, [player.id]);
