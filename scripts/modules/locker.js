@@ -14,7 +14,7 @@ const LOCKER_OWNER_KEY = "locker:owner";
 const LOCKER_KIND_KEY = "locker:kind";
 const LOCKER_BAG = "bag";
 const LOCKER_GEAR = "gear";
-const LOCKER_Y = 128;
+const LOCKER_Y = 400; // 世界边界外高空，玩家正常活动无法到达
 
 const GEAR_SLOT_MAP = [
   ["Head", 9],
