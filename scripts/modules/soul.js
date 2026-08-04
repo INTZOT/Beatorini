@@ -56,16 +56,20 @@ export function init() {
     for (const data of active.values()) {
       const p = data.player;
       try {
-        const mv = p.inputInfo?.getMovementVector?.() ?? { x: 0, z: 0 };
-        if (mv.x !== 0 || mv.z !== 0) {
-          console.warn(`[Soul] mv=${mv.x.toFixed(2)},${mv.z.toFixed(2)} pos=${data.pos.x.toFixed(1)},${data.pos.y.toFixed(1)},${data.pos.z.toFixed(1)}`);
+        const mv = p.inputInfo?.getMovementVector?.();
+        const mx = typeof mv?.x === "number" ? mv.x : 0;
+        const mz = typeof mv?.z === "number" ? mv.z : 0;
+        if (mx !== 0 || mz !== 0) {
+          console.warn(
+            `[Soul] mv=${JSON.stringify(mv)} pos=${JSON.stringify(data.pos)}`
+          );
         }
         const yaw = (p.getRotation().y * Math.PI) / 180;
         const sinY = Math.sin(yaw);
         const cosY = Math.cos(yaw);
         // 移动向量：前后/左右按视角朝向映射到世界坐标
-        let dx = -sinY * mv.z - cosY * mv.x;
-        let dz = cosY * mv.z - sinY * mv.x;
+        let dx = -sinY * mz - cosY * mx;
+        let dz = cosY * mz - sinY * mx;
         const len = Math.hypot(dx, dz);
         if (len > 1) {
           dx /= len;
@@ -87,7 +91,7 @@ export function init() {
         data.pos.z += dz * SOUL_MOVE_SPEED;
         p.camera.setCamera("minecraft:free", { location: data.pos });
       } catch (e) {
-        console.warn(`[Soul] tick failed: ${e}`);
+        console.warn(`[Soul] tick failed: ${e} stack=${e?.stack ?? ""}`);
       }
     }
   }, 2);
