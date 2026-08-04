@@ -76,59 +76,95 @@ export function init() {
     warnOnce(attacker, "§c大厅内禁止攻击");
   });
 
-  // 大厅丢弃物品：自动传送回玩家自己的岛屿上空
-  world.afterEvents.entityItemDrop.subscribe((event) => {
-    const dropper = event.entity;
-    if (!dropper || dropper.typeId !== "minecraft:player") return;
-    if (isAdmin(dropper)) return; // 管理员除外
-    if (dropper.dimension.id !== LOBBY_DIMENSION_ID) return;
+  // 大厅丢弃物品：定期扫描掉落物，按距离归属最近的有岛玩家并传送到其岛屿
+  system.runInterval(() => {
+    try {
+      const lobby = world.getDimension(LOBBY_DIMENSION_ID);
+      const items = lobby.getEntities({ type: "minecraft:item" });
+      if (items.length === 0) return;
 
-    const boundIndex = getPlayerBoundIndex(dropper.id);
-    if (boundIndex === undefined) return; // 无岛玩家无法传送，保持原地
-    const items = event.items.filter(Boolean);
-    console.warn(
-      `[LobbyGuard] Drop detected: ${dropper.name} items=${items.length} dim=${dropper.dimension.id} island=${boundIndex}`
-    );
-    if (items.length === 0) return;
-    const dim = world.getDimension(
-      `${DIMENSION_NAMESPACE}:void_${boundIndex}`
-    );
-    // 延迟 2 tick 让掉落物实体稳定；临时加载目标区块后再传送
-    system.runTimeout(async () => {
-      const manager = world.tickingAreaManager;
-      const areaName = `lobby_drop_${dropper.id}`;
-      const options = {
-        dimension: dim,
-        from: { x: -16, y: 64, z: -16 },
-        to: { x: 16, y: 120, z: 16 },
-      };
-      let created = false;
-      try {
-        if (!manager.hasTickingArea(areaName)) {
-          if (manager.hasCapacity(options)) {
-            await manager.createTickingArea(areaName, options);
-            created = true;
+      const lobbyPlayers = [...world.getPlayers()].filter(
+        (p) => p.dimension.id === LOBBY_DIMENSION_ID
+      );
+      // 按归属玩家分组
+      const groups = new Map();
+      for (const item of items) {
+        let best = null;
+        let bestDist = Infinity;
+        for (const p of lobbyPlayers) {
+          if (isAdmin(p)) continue; // 管理员除外
+          if (getPlayerBoundIndex(p.id) === undefined) continue;
+          const d = Math.hypot(
+            p.location.x - item.location.x,
+            p.location.z - item.location.z
+          );
+          if (d < bestDist) {
+            bestDist = d;
+            best = p;
           }
         }
-        await system.waitTicks(30);
-        for (const item of items) {
-          try {
-            item.teleport(
-              { x: 0.5, y: DROP_TELEPORT_Y, z: 0.5 },
-              { dimension: dim }
-            );
-          } catch (e) {
-            console.warn(`[LobbyGuard] Drop teleport failed: ${e}`);
-          }
-        }
-        warnOnce(dropper, "§a丢出的物品已传送回你的空岛（岛中心上空）");
-      } finally {
-        if (created) {
-          try {
-            manager.removeTickingArea(areaName);
-          } catch (e) {}
-        }
+        if (!best || bestDist > 8) continue; // 无法归属或距离过远
+        const list = groups.get(best.id) ?? [];
+        list.push({ item, player: best });
+        groups.set(best.id, list);
       }
-    }, 2);
-  });
+
+      for (const list of groups.values()) {
+        const player = list[0].player;
+        const dim = world.getDimension(
+          `${DIMENSION_NAMESPACE}:void_${getPlayerBoundIndex(player.id)}`
+        );
+        system.runTimeout(() => {
+          teleportItemsToIsland(dim, player, list.map((x) => x.item)).catch(
+            (e) => console.warn(`[LobbyGuard] Drop relay failed: ${e}`)
+          );
+        }, 1);
+      }
+    } catch (e) {
+      console.warn(`[LobbyGuard] Drop sweep failed: ${e}`);
+    }
+  }, 10);
+}
+
+async function teleportItemsToIsland(dim, player, items) {
+  const manager = world.tickingAreaManager;
+  const areaName = `lobby_drop_${player.id}`;
+  const options = {
+    dimension: dim,
+    from: { x: -16, y: 64, z: -16 },
+    to: { x: 16, y: 120, z: 16 },
+  };
+  let created = false;
+  try {
+    if (!manager.hasTickingArea(areaName)) {
+      if (manager.hasCapacity(options)) {
+        await manager.createTickingArea(areaName, options);
+        created = true;
+      }
+    }
+    await system.waitTicks(30);
+    let ok = 0;
+    for (const item of items) {
+      try {
+        if (item.isValid()) {
+          item.teleport(
+            { x: 0.5, y: DROP_TELEPORT_Y, z: 0.5 },
+            { dimension: dim }
+          );
+          ok++;
+        }
+      } catch (e) {
+        console.warn(`[LobbyGuard] Drop teleport failed: ${e}`);
+      }
+    }
+    if (ok > 0) {
+      warnOnce(player, `§a丢出的 ${ok} 个物品已传送回你的空岛（岛中心上空）`);
+    }
+  } finally {
+    if (created) {
+      try {
+        manager.removeTickingArea(areaName);
+      } catch (e) {}
+    }
+  }
 }
