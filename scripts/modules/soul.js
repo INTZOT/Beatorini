@@ -56,7 +56,10 @@ export function init() {
     for (const data of active.values()) {
       const p = data.player;
       try {
-        const mv = p.inputInfo.getMovementVector();
+        const mv = p.inputInfo?.getMovementVector?.() ?? { x: 0, z: 0 };
+        if (mv.x !== 0 || mv.z !== 0) {
+          console.warn(`[Soul] mv=${mv.x.toFixed(2)},${mv.z.toFixed(2)} pos=${data.pos.x.toFixed(1)},${data.pos.y.toFixed(1)},${data.pos.z.toFixed(1)}`);
+        }
         const yaw = (p.getRotation().y * Math.PI) / 180;
         const sinY = Math.sin(yaw);
         const cosY = Math.cos(yaw);
@@ -83,7 +86,9 @@ export function init() {
         data.pos.y += dy * SOUL_MOVE_SPEED;
         data.pos.z += dz * SOUL_MOVE_SPEED;
         p.camera.setCamera("minecraft:free", { location: data.pos });
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[Soul] tick failed: ${e}`);
+      }
     }
   }, 2);
 
