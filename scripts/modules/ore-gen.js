@@ -1,5 +1,4 @@
 import { system, world, BlockPermutation } from "@minecraft/server";
-import { getTalentLevel } from "./talent.js";
 
 // --- 矿石生成机制 ---
 const lavaMineStreaks = new Map();
@@ -80,10 +79,6 @@ export function init() {
     } else {
       currentChance = Math.min(baseChance + (streak - 79) * 0.0035, 1.0);
     }
-    // 天赋系统替代熟练度：急迫天赋等级提供熔岩挖矿加成
-    const hasteLevel = getTalentLevel(playerId, "haste");
-    currentChance += hasteLevel * 0.0005;
-
     // ActionBar：当前累计出矿概率 + 进度条（当前/最大 100%）
     const pct = Math.round(Math.min(currentChance, 1) * 1000) / 10;
     const ratio = Math.min(1, currentChance);
