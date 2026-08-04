@@ -1,0 +1,22 @@
+{
+  "format_version": "1.26.0",
+  "minecraft:entity": {
+    "description": {
+      "identifier": "beatorini:soul_marker",
+      "is_spawnable": false,
+      "is_summonable": true
+    },
+    "components": {
+      "minecraft:type_family": { "family": ["beatorini_soul_marker"] },
+      "minecraft:persistent": {},
+      "minecraft:physics": { "has_gravity": false, "has_collision": false },
+      "minecraft:fire_immune": {},
+      "minecraft:pushable": {
+        "is_pushable": false,
+        "is_pushable_by_piston": false
+      },
+      "minecraft:collision_box": { "width": 0.01, "height": 0.01 },
+      "minecraft:health": { "value": 100, "max": 100 }
+    }
+  }
+}

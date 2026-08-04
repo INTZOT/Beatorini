@@ -24,7 +24,7 @@ function enterSoul(player) {
   }
   const loc = player.location;
   try {
-    const marker = player.dimension.spawnEntity("minecraft:armor_stand", {
+    const marker = player.dimension.spawnEntity("beatorini:soul_marker", {
       x: Math.floor(loc.x) + 0.5,
       y: Math.floor(loc.y),
       z: Math.floor(loc.z) + 0.5,
@@ -38,6 +38,7 @@ function enterSoul(player) {
       marker,
       originalMode,
       fixedPos: marker.location,
+      dimensionId: player.dimension.id,
     });
     player.runCommand("gamemode spectator @s");
 
@@ -74,6 +75,13 @@ function exitSoul(player, reason) {
       player.teleport(marker.location, { dimension: marker.dimension });
       marker.remove();
     } catch (e) {}
+  } else if (data) {
+    // 标记已失效：按记录位置兜底传送
+    try {
+      player.teleport(data.fixedPos, {
+        dimension: world.getDimension(data.dimensionId),
+      });
+    } catch (e) {}
   }
 
   try {
@@ -90,18 +98,6 @@ function restoreAfterReload(player) {
 }
 
 export function init() {
-  // 盔甲架钉回生成位置，等效不受重力影响（悬浮标记）
-  system.runInterval(() => {
-    for (const data of active.values()) {
-      const m = data.marker;
-      try {
-        if (m?.isValid()) {
-          m.teleport(data.fixedPos, { dimension: m.dimension });
-        }
-      } catch (e) {}
-    }
-  }, 2);
-
   // 脚本重载后恢复在线玩家
   world.afterEvents.worldLoad.subscribe(() => {
     for (const p of world.getPlayers()) {
@@ -115,10 +111,10 @@ export function init() {
     system.runTimeout(() => restoreAfterReload(p), 10);
   });
 
-  // 盔甲架标记受到伤害时自动退出灵魂出窍
+  // 灵魂标记受到伤害时自动退出灵魂出窍
   world.afterEvents.entityHurt.subscribe((event) => {
     const ent = event.hurtEntity;
-    if (ent.typeId !== "minecraft:armor_stand") return;
+    if (ent.typeId !== "beatorini:soul_marker") return;
     const ownerId = ent.getDynamicProperty(SOUL_OWNER_KEY);
     if (!ownerId) return;
     const player = [...world.getPlayers()].find((p) => p.id === ownerId);
