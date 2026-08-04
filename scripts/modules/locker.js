@@ -191,6 +191,16 @@ export async function unstashPlayerInventory(player) {
       const gearC = getEntityContainer(gear);
       if (!bagC || !gearC) return;
 
+      // 储物柜为空：说明玩家并非刚从大厅/他岛返回，不清空背包（防御误触发）
+      let hasAny = false;
+      for (let i = 0; i < 27; i++) {
+        if (bagC.getItem(i) || gearC.getItem(i)) {
+          hasAny = true;
+          break;
+        }
+      }
+      if (!hasAny) return;
+
       for (let i = 0; i < 27; i++) {
         const item = bagC.getItem(i);
         if (item) inv.setItem(i + 9, item);
