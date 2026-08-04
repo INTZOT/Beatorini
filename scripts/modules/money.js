@@ -1,4 +1,4 @@
-import { system, world } from "@minecraft/server";
+import { world } from "@minecraft/server";
 
 /** 确保 money 计分板存在，不存在则自动创建 */
 export function ensureMoneyObjective() {
@@ -34,7 +34,7 @@ export function getPlayerMoney(player) {
 /** 初始化：启动时确保计分板存在 */
 export function init() {
   // world.scoreboard 需在世界启动后可用
-  system.beforeEvents.startup.subscribe(() => {
+  world.afterEvents.worldLoad.subscribe(() => {
     ensureMoneyObjective();
   });
 }

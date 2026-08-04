@@ -14,7 +14,7 @@ const LOCKER_OWNER_KEY = "locker:owner";
 const LOCKER_KIND_KEY = "locker:kind";
 const LOCKER_BAG = "bag";
 const LOCKER_GEAR = "gear";
-const LOCKER_Y = 400; // 世界边界外高空，玩家正常活动无法到达
+const LOCKER_Y = 319; // 世界高度边界内最高层，玩家正常建筑难以到达
 const LOCKER_AREA_HALF = 16; // 临时常加载区域半径（方块）
 
 const GEAR_SLOT_MAP = [
@@ -62,7 +62,7 @@ async function withLockerArea(dim, playerId, fn) {
     },
     to: {
       x: pos.x + LOCKER_AREA_HALF,
-      y: LOCKER_Y + 10,
+      y: Math.min(319, LOCKER_Y + 10),
       z: pos.z + LOCKER_AREA_HALF,
     },
   };

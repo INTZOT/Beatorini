@@ -1083,7 +1083,7 @@ function showAbandonConfirm(player, boundIndex, backFn) {
 
 export function init() {
   // world API 需在世界启动后可用：恢复被中断的重置倒计时
-  system.beforeEvents.startup.subscribe(() => {
+  world.afterEvents.worldLoad.subscribe(() => {
     try {
       restorePendingResets();
     } catch (e) {
