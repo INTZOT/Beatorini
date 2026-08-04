@@ -80,6 +80,7 @@ export function init() {
   world.afterEvents.entityItemDrop.subscribe((event) => {
     const dropper = event.entity;
     if (!dropper || dropper.typeId !== "minecraft:player") return;
+    if (isAdmin(dropper)) return; // 管理员除外
     if (dropper.dimension.id !== LOBBY_DIMENSION_ID) return;
 
     const boundIndex = getPlayerBoundIndex(dropper.id);
