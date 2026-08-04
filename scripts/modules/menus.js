@@ -352,7 +352,8 @@ export function init() {
     }
     if (event.message === "#fc on" || event.message === "#fc off") {
       event.cancel = true;
-      toggleSoul(player, event.message === "#fc on");
+      const on = event.message === "#fc on";
+      system.runTimeout(() => toggleSoul(player, on), 1);
       return;
     }
     if (event.message === "#menu") {
