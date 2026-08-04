@@ -246,6 +246,7 @@ export function handleLobby(player) {
     }
     player.sendMessage("§a已传送至大厅！");
     player.playSound("random.orb");
+    giveMenuClock(player);
     try {
       player.removeTag("visitor");
       player.addTag("member");
@@ -495,6 +496,13 @@ export function handleTransfer(player, targetName) {
 function giveMenuClock(player) {
   try {
     const inventory = player.getComponent("inventory").container;
+    // 清理已有菜单时钟，避免重复堆积
+    for (let i = 0; i < inventory.size; i++) {
+      const item = inventory.getItem(i);
+      if (item?.typeId === "minecraft:clock") {
+        inventory.setItem(i, undefined);
+      }
+    }
     const clock = new ItemStack("minecraft:clock", 1);
     const leftover = inventory.addItem(clock);
     if (leftover) player.dimension.spawnItem(leftover, player.location);
