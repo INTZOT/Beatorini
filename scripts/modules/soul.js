@@ -1,13 +1,13 @@
 // ============================================================
-// 灵魂出窍：自由相机视角脱离身体探索。
-// 命令 #fc on / #fc off 开关；受伤/死亡/离开世界/脚本重载自动退出。
-// 身体不做无敌处理，可被攻击，死亡惩罚照常。
+// 灵魂出窍：原地生成盔甲架标记位置，玩家切换旁观者模式自由飞行；
+// #fc off 传送回标记位置并恢复原游戏模式。
+// 出窍状态落盘（动态属性），脚本重载/玩家重连自动恢复。
 // ============================================================
-import { system, world, InputButton, ButtonState } from "@minecraft/server";
+import { system, world } from "@minecraft/server";
 
 const SOUL_KEY = "soul:active_";
-const SOUL_MOVE_SPEED = 0.215; // 块/tick（约等于行走速度 4.3 块/秒）
-const active = new Map(); // playerId -> { player, pos }
+const SOUL_OWNER_KEY = "soul:owner";
+const active = new Map(); // playerId -> { marker, originalMode }
 
 export function toggleSoul(player, on) {
   if (on) {
@@ -24,103 +24,78 @@ function enterSoul(player) {
   }
   const loc = player.location;
   try {
-    player.camera.setCamera("minecraft:free", {
-      location: { x: loc.x, y: loc.y + 1.5, z: loc.z },
+    const marker = player.dimension.spawnEntity("minecraft:armor_stand", {
+      x: Math.floor(loc.x) + 0.5,
+      y: Math.floor(loc.y),
+      z: Math.floor(loc.z) + 0.5,
     });
-    world.setDynamicProperty(SOUL_KEY + player.id, true);
-    active.set(player.id, {
-      player,
-      pos: { x: loc.x, y: loc.y + 1.5, z: loc.z },
-    });
-    player.sendMessage("§a已开启灵魂出窍！输入 #fc off 关闭");
+    marker.nameTag = `§e${player.name} 的灵魂`;
+    marker.setDynamicProperty(SOUL_OWNER_KEY, player.id);
+
+    const originalMode = String(player.getGameMode()).toLowerCase();
+    world.setDynamicProperty(SOUL_KEY + player.id, marker.id);
+    active.set(player.id, { marker, originalMode });
+    player.runCommand("gamemode spectator @s");
+
+    player.sendMessage(
+      "§a已开启灵魂出窍！身体位置已标记，输入 #fc off 传送回身体"
+    );
     player.playSound("random.orb");
   } catch (e) {
+    world.setDynamicProperty(SOUL_KEY + player.id, undefined);
+    try {
+      active.get(player.id)?.marker?.remove();
+    } catch (e2) {}
+    active.delete(player.id);
     player.sendMessage(`§c开启灵魂出窍失败: ${e}`);
   }
 }
 
 function exitSoul(player, reason) {
-  if (!world.getDynamicProperty(SOUL_KEY + player.id)) return;
+  const markerId = world.getDynamicProperty(SOUL_KEY + player.id);
+  if (!markerId) return;
   world.setDynamicProperty(SOUL_KEY + player.id, undefined);
+
+  const data = active.get(player.id);
+  let originalMode = data?.originalMode;
+  if (!originalMode) {
+    const current = String(player.getGameMode()).toLowerCase();
+    originalMode = current === "spectator" ? "survival" : current;
+  }
   active.delete(player.id);
+
+  const marker = world.getEntity(markerId);
+  if (marker) {
+    try {
+      player.teleport(marker.location, { dimension: marker.dimension });
+      marker.remove();
+    } catch (e) {}
+  }
+
   try {
-    player.camera.setCamera("minecraft:first_person");
+    player.runCommand(`gamemode ${originalMode} @s`);
   } catch (e) {}
   player.sendMessage(`§e已退出灵魂出窍（${reason}）`);
   player.playSound("random.orb");
 }
 
-export function init() {
-  // 出窍期间：按输入实时移动自由相机位置
-  system.runInterval(() => {
-    for (const data of active.values()) {
-      const p = data.player;
-      try {
-        const mv = p.inputInfo?.getMovementVector?.();
-        const mx = typeof mv?.x === "number" ? mv.x : 0;
-        const mz = typeof mv?.z === "number" ? mv.z : 0;
-        if (mx !== 0 || mz !== 0) {
-          console.warn(
-            `[Soul] mv=${JSON.stringify(mv)} pos=${JSON.stringify(data.pos)}`
-          );
-        }
-        const yaw = (p.getRotation().y * Math.PI) / 180;
-        const sinY = Math.sin(yaw);
-        const cosY = Math.cos(yaw);
-        // 移动向量：前后/左右按视角朝向映射到世界坐标
-        let dx = -sinY * mz - cosY * mx;
-        let dz = cosY * mz - sinY * mx;
-        const len = Math.hypot(dx, dz);
-        if (len > 1) {
-          dx /= len;
-          dz /= len;
-        }
-        let dy = 0;
-        if (
-          p.inputInfo.getButtonState(InputButton.Jump) === ButtonState.Pressed
-        ) {
-          dy += 1;
-        }
-        if (
-          p.inputInfo.getButtonState(InputButton.Sneak) === ButtonState.Pressed
-        ) {
-          dy -= 1;
-        }
-        data.pos.x += dx * SOUL_MOVE_SPEED;
-        data.pos.y += dy * SOUL_MOVE_SPEED;
-        data.pos.z += dz * SOUL_MOVE_SPEED;
-        p.camera.setCamera("minecraft:free", { location: data.pos });
-      } catch (e) {
-        console.warn(`[Soul] tick failed: ${e} stack=${e?.stack ?? ""}`);
-      }
-    }
-  }, 2);
+function restoreAfterReload(player) {
+  if (world.getDynamicProperty(SOUL_KEY + player.id)) {
+    exitSoul(player, "脚本重载");
+  }
+}
 
-  // 脚本重载后强制恢复：残留出窍标志的玩家退出自由相机
+export function init() {
+  // 脚本重载后恢复在线玩家
   world.afterEvents.worldLoad.subscribe(() => {
     for (const p of world.getPlayers()) {
-      if (world.getDynamicProperty(SOUL_KEY + p.id)) {
-        exitSoul(p, "脚本重载");
-      }
+      restoreAfterReload(p);
     }
   });
 
-  // 死亡自动退出
-  world.afterEvents.entityDie.subscribe((event) => {
-    if (event.deadEntity.typeId === "minecraft:player") {
-      exitSoul(event.deadEntity, "死亡");
-    }
-  });
-
-  // 受伤自动退出
-  world.afterEvents.entityHurt.subscribe((event) => {
-    if (event.hurtEntity.typeId === "minecraft:player") {
-      exitSoul(event.hurtEntity, "受伤");
-    }
-  });
-
-  // 离开世界清理状态
-  world.afterEvents.playerLeave.subscribe((event) => {
-    world.setDynamicProperty(SOUL_KEY + event.playerId, undefined);
+  // 玩家重连恢复（离线期间标记保留在存档中）
+  world.afterEvents.playerJoin.subscribe((event) => {
+    const p = event.player;
+    system.runTimeout(() => restoreAfterReload(p), 10);
   });
 }
