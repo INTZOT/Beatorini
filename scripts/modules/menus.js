@@ -22,6 +22,7 @@ import {
 import { getAchievements, ACHIEVEMENTS } from "./achievements.js";
 import { showLeaderboardMenu } from "./leaderboard.js";
 import { showTalentMenu } from "./talent.js";
+import { toggleSoul } from "./soul.js";
 import { showMarketMenu, showMarketUnlockForm, onPlayerJoin as marketOnPlayerJoin } from "./market.js";
 import { showRecycleCategoryMenu } from "./recycle.js";
 import { showSigninForm } from "./signin.js";
@@ -347,6 +348,11 @@ export function init() {
     if (event.message === "#island") {
       event.cancel = true;
       handleIsland(player);
+      return;
+    }
+    if (event.message === "#fc on" || event.message === "#fc off") {
+      event.cancel = true;
+      toggleSoul(player, event.message === "#fc on");
       return;
     }
     if (event.message === "#menu") {
