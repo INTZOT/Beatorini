@@ -118,11 +118,21 @@ export function init() {
         const dx = loc.x - data.fixedPos.x;
         const dy = loc.y - data.fixedPos.y;
         const dz = loc.z - data.fixedPos.z;
-        if (Math.sqrt(dx * dx + dy * dy + dz * dz) > SOUL_MAX_RANGE) {
-          p.teleport(data.fixedPos, {
-            dimension: world.getDimension(data.dimensionId),
-          });
-          p.sendMessage(`§c已到达灵魂出窍边界（r${SOUL_MAX_RANGE}），已拉回标记位置`);
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist > SOUL_MAX_RANGE) {
+          // 拉回边界点（标记→玩家的方向上距离 r96 的位置），而非标记点
+          const scale = SOUL_MAX_RANGE / dist;
+          p.teleport(
+            {
+              x: data.fixedPos.x + dx * scale,
+              y: data.fixedPos.y + dy * scale,
+              z: data.fixedPos.z + dz * scale,
+            },
+            {
+              dimension: world.getDimension(data.dimensionId),
+            }
+          );
+          p.sendMessage(`§c已到达灵魂出窍边界（r${SOUL_MAX_RANGE}），无法继续向外移动`);
         }
       } catch (e) {}
     }
