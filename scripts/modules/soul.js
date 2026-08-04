@@ -3,9 +3,11 @@
 // 命令 #fc on / #fc off 开关；受伤/死亡/离开世界/脚本重载自动退出。
 // 身体不做无敌处理，可被攻击，死亡惩罚照常。
 // ============================================================
-import { world } from "@minecraft/server";
+import { system, world, InputButton, ButtonState } from "@minecraft/server";
 
 const SOUL_KEY = "soul:active_";
+const SOUL_MOVE_SPEED = 0.215; // 块/tick（约等于行走速度 4.3 块/秒）
+const active = new Map(); // playerId -> { player, pos }
 
 export function toggleSoul(player, on) {
   if (on) {
@@ -26,6 +28,10 @@ function enterSoul(player) {
       location: { x: loc.x, y: loc.y + 1.5, z: loc.z },
     });
     world.setDynamicProperty(SOUL_KEY + player.id, true);
+    active.set(player.id, {
+      player,
+      pos: { x: loc.x, y: loc.y + 1.5, z: loc.z },
+    });
     player.sendMessage("§a已开启灵魂出窍！输入 #fc off 关闭");
     player.playSound("random.orb");
   } catch (e) {
@@ -36,6 +42,7 @@ function enterSoul(player) {
 function exitSoul(player, reason) {
   if (!world.getDynamicProperty(SOUL_KEY + player.id)) return;
   world.setDynamicProperty(SOUL_KEY + player.id, undefined);
+  active.delete(player.id);
   try {
     player.camera.setCamera("minecraft:first_person");
   } catch (e) {}
@@ -44,6 +51,42 @@ function exitSoul(player, reason) {
 }
 
 export function init() {
+  // 出窍期间：按输入实时移动自由相机位置
+  system.runInterval(() => {
+    for (const data of active.values()) {
+      const p = data.player;
+      try {
+        const mv = p.inputInfo.getMovementVector();
+        const yaw = (p.getRotation().y * Math.PI) / 180;
+        const sinY = Math.sin(yaw);
+        const cosY = Math.cos(yaw);
+        // 移动向量：前后/左右按视角朝向映射到世界坐标
+        let dx = -sinY * mv.z - cosY * mv.x;
+        let dz = cosY * mv.z - sinY * mv.x;
+        const len = Math.hypot(dx, dz);
+        if (len > 1) {
+          dx /= len;
+          dz /= len;
+        }
+        let dy = 0;
+        if (
+          p.inputInfo.getButtonState(InputButton.Jump) === ButtonState.Pressed
+        ) {
+          dy += 1;
+        }
+        if (
+          p.inputInfo.getButtonState(InputButton.Sneak) === ButtonState.Pressed
+        ) {
+          dy -= 1;
+        }
+        data.pos.x += dx * SOUL_MOVE_SPEED;
+        data.pos.y += dy * SOUL_MOVE_SPEED;
+        data.pos.z += dz * SOUL_MOVE_SPEED;
+        p.camera.setCamera("minecraft:free", { location: data.pos });
+      } catch (e) {}
+    }
+  }, 2);
+
   // 脚本重载后强制恢复：残留出窍标志的玩家退出自由相机
   world.afterEvents.worldLoad.subscribe(() => {
     for (const p of world.getPlayers()) {
