@@ -571,7 +571,7 @@ function abandonIsland(player, islandIndex) {
   );
   scheduleIslandReset(islandIndex);
 
-  player.sendMessage("§c岛屿已放弃，60 秒后自动重置，重置完成后等待管理员确认开放");
+  player.sendMessage("§c岛屿已放弃，5 秒后自动重置，重置完成后等待管理员确认开放");
   player.playSound("random.break");
   world.sendMessage(`§c玩家 ${player.name} 放弃了岛屿 #${islandIndex}`);
 }
