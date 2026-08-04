@@ -4,9 +4,14 @@
 // 菜单时钟必须放行（右键时钟走 itemUse 事件打开菜单）。
 // ============================================================
 import { system, world } from "@minecraft/server";
-import { LOBBY_DIMENSION_ID } from "./config.js";
+import {
+  DIMENSION_NAMESPACE,
+  LOBBY_DIMENSION_ID,
+} from "./config.js";
+import { getPlayerBoundIndex } from "./island.js";
 
 const warnCooldown = new Map();
+const DROP_TELEPORT_Y = 100; // 传回岛屿上空，物品自然落回岛中心附近
 
 function isAdmin(entity) {
   return entity?.hasTag?.("op") ?? false;
@@ -69,5 +74,27 @@ export function init() {
     if (isAdmin(attacker) || !inLobby(attacker)) return;
     event.cancel = true;
     warnOnce(attacker, "§c大厅内禁止攻击");
+  });
+
+  // 大厅丢弃物品：自动传送回玩家自己的岛屿上空
+  world.afterEvents.entityItemDrop.subscribe((event) => {
+    const dropper = event.entity;
+    if (!dropper || dropper.typeId !== "minecraft:player") return;
+    if (dropper.dimension.id !== LOBBY_DIMENSION_ID) return;
+
+    const boundIndex = getPlayerBoundIndex(dropper.id);
+    if (boundIndex === undefined) return; // 无岛玩家无法传送，保持原地
+    const dim = world.getDimension(
+      `${DIMENSION_NAMESPACE}:void_${boundIndex}`
+    );
+    for (const item of event.items) {
+      try {
+        item.teleport(
+          { x: 0.5, y: DROP_TELEPORT_Y, z: 0.5 },
+          { dimension: dim }
+        );
+      } catch (e) {}
+    }
+    warnOnce(dropper, "§a丢出的物品已传送回你的空岛（岛中心上空）");
   });
 }
