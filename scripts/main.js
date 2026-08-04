@@ -6,6 +6,7 @@
 import { init as initDimensions } from "./modules/dimensions.js";
 import { init as initVault } from "./modules/vault.js";
 import { init as initIsland } from "./modules/island.js";
+import { init as initLobbyGuard } from "./modules/lobby-guard.js";
 import { init as initMarket } from "./modules/market.js";
 import { init as initMoney } from "./modules/money.js";
 import { init as initStats } from "./modules/stats.js";
@@ -27,6 +28,7 @@ import { init as initMenus } from "./modules/menus.js";
 initDimensions();
 initVault();
 initIsland();
+initLobbyGuard();
 initMarket();
 initMoney();
 initStats();
