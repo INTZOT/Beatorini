@@ -2,6 +2,9 @@
 .agents/
 .codex/
 
+# 外部参考脚本（不参与打包/提交）
+scripts/灵魂出窍参考/
+
 # 系统与编辑器临时文件
 Thumbs.db
 Desktop.ini
