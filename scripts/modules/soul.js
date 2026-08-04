@@ -98,4 +98,22 @@ export function init() {
     const p = event.player;
     system.runTimeout(() => restoreAfterReload(p), 10);
   });
+
+  // 盔甲架标记受到伤害时自动退出灵魂出窍
+  world.afterEvents.entityHurt.subscribe((event) => {
+    const ent = event.hurtEntity;
+    if (ent.typeId !== "minecraft:armor_stand") return;
+    const ownerId = ent.getDynamicProperty(SOUL_OWNER_KEY);
+    if (!ownerId) return;
+    const player = [...world.getPlayers()].find((p) => p.id === ownerId);
+    if (player) {
+      exitSoul(player, "身体标记受击");
+    } else {
+      world.setDynamicProperty(SOUL_KEY + ownerId, undefined);
+      active.delete(ownerId);
+      try {
+        ent.remove();
+      } catch (e) {}
+    }
+  });
 }
