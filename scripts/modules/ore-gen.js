@@ -71,14 +71,9 @@ export function init() {
     const playerId = player.id;
     let streak = lavaMineStreaks.get(playerId) ?? 0;
 
-    // 动态概率
+    // 动态概率：每次未出矿挖掘固定 +0.2%（0.002），第 500 次挖掘达到 100%
     const baseChance = 0.002;
-    let currentChance;
-    if (streak < 80) {
-      currentChance = baseChance;
-    } else {
-      currentChance = Math.min(baseChance + (streak - 79) * 0.0035, 1.0);
-    }
+    const currentChance = Math.min(baseChance + streak * 0.002, 1.0);
     // ActionBar：当前累计出矿概率 + 进度条（当前/最大 100%）
     const pct = Math.round(Math.min(currentChance, 1) * 1000) / 10;
     const ratio = Math.min(1, currentChance);
