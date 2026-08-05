@@ -22,7 +22,9 @@ const PICKAXE_CHAIN = [
   "minecraft:netherite_pickaxe",
 ];
 
-const ORE_MIN_LEVEL = {
+const BLOCK_MIN_LEVEL = {
+  "minecraft:stone": 0,
+  "minecraft:cobblestone": 0,
   "minecraft:coal_ore": 0,
   "minecraft:copper_ore": 0,
   "minecraft:quartz_ore": 0,
@@ -100,9 +102,9 @@ export function showAssistantMenu(player, backFn) {
 // 刷石机工具自动选择
 // ============================================================
 
-/** 生成矿石时调用：主手工具不足以挖掘则从背包检索最低级合适镐并交换 */
-export function autoSelectPickaxe(player, oreTypeId) {
-  const required = ORE_MIN_LEVEL[oreTypeId];
+/** 开始挖掘时调用：主手工具不满足可挖掘条件则从背包检索最低级合适镐并交换 */
+export function autoSelectPickaxe(player, blockTypeId) {
+  const required = BLOCK_MIN_LEVEL[blockTypeId];
   if (required === undefined) return;
   const inv = player.getComponent("inventory")?.container;
   if (!inv) return;
@@ -177,19 +179,19 @@ function clearSwap(playerId) {
 }
 
 export function init() {
-  // 开始挖掘矿石时自动切换合适工具（挖掘进度按新工具实时计算）
+  // 开始挖掘石头/圆石/矿石时自动切换合适工具（挖掘进度按新工具实时计算）
   world.afterEvents.playerStartBreakingBlock.subscribe((event) => {
-    const oreId = event.blockPermutation?.type?.id;
-    if (!oreId || ORE_MIN_LEVEL[oreId] === undefined) return;
+    const blockId = event.blockPermutation?.type?.id;
+    if (!blockId || BLOCK_MIN_LEVEL[blockId] === undefined) return;
     const player = event.player;
     if (!getAssistSettings(player.id).stoneAutoTool) return;
-    autoSelectPickaxe(player, oreId);
+    autoSelectPickaxe(player, blockId);
   });
 
-  // 挖掉矿石后复位临时工具
+  // 挖掉触发方块后复位临时工具
   world.afterEvents.playerBreakBlock.subscribe((event) => {
-    const oreId = event.brokenBlockPermutation?.type?.id;
-    if (oreId && ORE_MIN_LEVEL[oreId] !== undefined) {
+    const blockId = event.brokenBlockPermutation?.type?.id;
+    if (blockId && BLOCK_MIN_LEVEL[blockId] !== undefined) {
       completeSwap(event.player);
     }
   });
