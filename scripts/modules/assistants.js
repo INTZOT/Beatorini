@@ -177,6 +177,23 @@ function clearSwap(playerId) {
 }
 
 export function init() {
+  // 开始挖掘矿石时自动切换合适工具（挖掘进度按新工具实时计算）
+  world.afterEvents.playerStartBreakingBlock.subscribe((event) => {
+    const oreId = event.blockPermutation?.type?.id;
+    if (!oreId || ORE_MIN_LEVEL[oreId] === undefined) return;
+    const player = event.player;
+    if (!getAssistSettings(player.id).stoneAutoTool) return;
+    autoSelectPickaxe(player, oreId);
+  });
+
+  // 挖掉矿石后复位临时工具
+  world.afterEvents.playerBreakBlock.subscribe((event) => {
+    const oreId = event.brokenBlockPermutation?.type?.id;
+    if (oreId && ORE_MIN_LEVEL[oreId] !== undefined) {
+      completeSwap(event.player);
+    }
+  });
+
   world.afterEvents.entityDie.subscribe((event) => {
     if (event.deadEntity.typeId === "minecraft:player") {
       clearSwap(event.deadEntity.id);

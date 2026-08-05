@@ -1,9 +1,4 @@
 import { system, world, BlockPermutation } from "@minecraft/server";
-import {
-  getAssistSettings,
-  autoSelectPickaxe,
-  completeSwap,
-} from "./assistants.js";
 
 // --- 矿石生成机制 ---
 const lavaMineStreaks = new Map();
@@ -111,19 +106,8 @@ export function init() {
     if (targetBlock) {
       targetBlock.setPermutation(BlockPermutation.resolve(selectedOre));
       const oreName = ORE_NAMES[selectedOre] ?? selectedOre;
-      if (getAssistSettings(playerId).stoneAutoTool) {
-        autoSelectPickaxe(player, selectedOre);
-      }
       player.sendMessage(`§e⚡ 发现 ${oreName}！`);
       player.playSound("random.levelup");
-    }
-  });
-
-  // 挖掉生成的矿石后复位临时工具
-  world.afterEvents.playerBreakBlock.subscribe((event) => {
-    const oreId = event.brokenBlockPermutation?.type?.id;
-    if (oreId && ORE_TABLE.some((o) => o.id === oreId)) {
-      completeSwap(event.player);
     }
   });
 }
