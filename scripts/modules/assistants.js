@@ -47,7 +47,7 @@ const BLOCK_MIN_LEVEL = {
   "minecraft:iron_ore": 1,
   "minecraft:gold_ore": 2,
   "minecraft:redstone_ore": 2,
-  "minecraft:lapis_ore": 2,
+  "minecraft:lapis_ore": 1,
   "minecraft:diamond_ore": 2,
   "minecraft:emerald_ore": 2,
   "minecraft:ancient_debris": 3,
