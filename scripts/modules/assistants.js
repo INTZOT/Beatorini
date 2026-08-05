@@ -53,8 +53,6 @@ const BLOCK_MIN_LEVEL = {
   "minecraft:ancient_debris": 3,
 };
 
-const pendingSwaps = new Map(); // playerId -> { found, slot }
-
 export function getAssistSettings(playerId) {
   const raw = world.getDynamicProperty(ASSIST_KEY + playerId);
   if (raw) {
@@ -132,19 +130,6 @@ export function autoSelectPickaxe(player, blockTypeId) {
     if (lvl >= required) return; // 当前工具已够用
   }
 
-  // 清理上一次未完成的交换
-  const old = pendingSwaps.get(player.id);
-  if (old) {
-    try {
-      const cur = inv.getItem(selectedSlot);
-      if (cur?.typeId === old.found.typeId) {
-        inv.setItem(selectedSlot, inv.getItem(old.slot) ?? undefined);
-        inv.setItem(old.slot, cur);
-      }
-    } catch (e) {}
-    pendingSwaps.delete(player.id);
-  }
-
   // 从所需等级开始找最低级合适镐（链内等级越低越优先）
   let found = null;
   let foundSlot = -1;
@@ -169,32 +154,6 @@ export function autoSelectPickaxe(player, blockTypeId) {
   const original = inv.getItem(selectedSlot);
   inv.setItem(foundSlot, original ?? undefined);
   inv.setItem(selectedSlot, found);
-  pendingSwaps.set(player.id, { found, slot: foundSlot });
-}
-
-/** 挖掉矿石后调用：恢复原手持工具并把临时镐放回背包 */
-export function completeSwap(player) {
-  const old = pendingSwaps.get(player.id);
-  if (!old) return;
-  pendingSwaps.delete(player.id);
-  try {
-    const inv = player.getComponent("inventory")?.container;
-    if (!inv) return;
-    const selectedSlot = player.selectedSlotIndex;
-    const cur = inv.getItem(selectedSlot);
-    if (cur?.typeId === old.found.typeId) {
-      const original = inv.getItem(old.slot);
-      inv.setItem(old.slot, cur);
-      inv.setItem(selectedSlot, original ?? undefined);
-    } else if (!inv.getItem(old.slot)) {
-      // 玩家手动换过主手：临时镐放回原槽（若槽空）
-      inv.setItem(old.slot, cur ?? undefined);
-    }
-  } catch (e) {}
-}
-
-function clearSwap(playerId) {
-  pendingSwaps.delete(playerId);
 }
 
 export function init() {
@@ -207,20 +166,4 @@ export function init() {
     autoSelectPickaxe(player, blockId);
   });
 
-  // 挖掉触发方块后复位临时工具
-  world.afterEvents.playerBreakBlock.subscribe((event) => {
-    const blockId = event.brokenBlockPermutation?.type?.id;
-    if (blockId && BLOCK_MIN_LEVEL[blockId] !== undefined) {
-      completeSwap(event.player);
-    }
-  });
-
-  world.afterEvents.entityDie.subscribe((event) => {
-    if (event.deadEntity.typeId === "minecraft:player") {
-      clearSwap(event.deadEntity.id);
-    }
-  });
-  world.afterEvents.playerLeave.subscribe((event) => {
-    clearSwap(event.playerId);
-  });
 }
