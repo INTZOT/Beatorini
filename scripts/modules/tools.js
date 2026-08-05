@@ -1,5 +1,6 @@
 import { system, world } from "@minecraft/server";
 import { isReplaceableTool } from "../lib/inventory.js";
+import { getAssistSettings } from "./assistants.js";
 
 /** 自动替换工具：背包中搜索同种物品替换到快捷栏 */
 function autoReplaceTool(player, typeId) {
@@ -26,6 +27,7 @@ export function init() {
   // 挖掘方块导致工具损坏（镐/斧/铲）
   world.afterEvents.playerBreakBlock.subscribe((event) => {
     const { player, itemStackBeforeBreak, itemStackAfterBreak } = event;
+    if (!getAssistSettings(player.id).toolRefill) return;
     if (!itemStackBeforeBreak) return;
     if (!isReplaceableTool(itemStackBeforeBreak.typeId)) return;
     if (itemStackAfterBreak) return;
@@ -37,6 +39,7 @@ export function init() {
   // 使用物品后检查工具是否损坏（锄头耕地、斧头去皮等）
   world.afterEvents.itemUse.subscribe((event) => {
     const { source: player, itemStack } = event;
+    if (!player || !getAssistSettings(player.id).toolRefill) return;
     if (!player || !itemStack) return;
     if (!isReplaceableTool(itemStack.typeId)) return;
 

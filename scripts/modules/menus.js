@@ -26,6 +26,7 @@ import { toggleSoul, isSoulActive } from "./soul.js";
 import { showMarketMenu, showMarketUnlockForm, onPlayerJoin as marketOnPlayerJoin } from "./market.js";
 import { showRecycleCategoryMenu } from "./recycle.js";
 import { showSigninForm } from "./signin.js";
+import { showAssistantMenu, getAssistSettings } from "./assistants.js";
 import { debugVault } from "./vault.js";
 import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
 
@@ -74,6 +75,13 @@ function showIslandMenu(player) {
     f.close();
     system.runTimeout(
       () => showTalentMenu(player, showIslandMenu),
+      2
+    );
+  });
+  f = f.button("辅助功能", () => {
+    f.close();
+    system.runTimeout(
+      () => showAssistantMenu(player, showIslandMenu),
       2
     );
   });
@@ -519,6 +527,7 @@ export function init() {
   // ============================================================
   world.afterEvents.playerPlaceBlock.subscribe((event) => {
     const { player, block } = event;
+    if (!getAssistSettings(player.id).blockRefill) return;
     const blockId = block.typeId;
 
     system.runTimeout(() => {
