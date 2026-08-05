@@ -58,9 +58,15 @@ function setAssistSettings(playerId, settings) {
 export function showAssistantMenu(player, backFn) {
   const pid = player.id;
   const s = getAssistSettings(pid);
-  const blockRefill = new ObservableBoolean(s.blockRefill);
-  const toolRefill = new ObservableBoolean(s.toolRefill);
-  const stoneAutoTool = new ObservableBoolean(s.stoneAutoTool);
+  const blockRefill = new ObservableBoolean(s.blockRefill, {
+    clientWritable: true,
+  });
+  const toolRefill = new ObservableBoolean(s.toolRefill, {
+    clientWritable: true,
+  });
+  const stoneAutoTool = new ObservableBoolean(s.stoneAutoTool, {
+    clientWritable: true,
+  });
 
   const form = new CustomForm(player, "辅助功能")
     .label("§7选择你要启用的个人辅助功能")
