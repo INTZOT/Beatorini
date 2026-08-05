@@ -14,12 +14,28 @@ const DEFAULT_SETTINGS = {
   stoneAutoTool: true,
 };
 
-const PICKAXE_CHAIN = [
-  "minecraft:wooden_pickaxe",
-  "minecraft:stone_pickaxe",
-  "minecraft:iron_pickaxe",
-  "minecraft:diamond_pickaxe",
-  "minecraft:netherite_pickaxe",
+// 镐等级：铜镐/金镐与石镐同级（1）
+const PICKAXE_LEVEL = {
+  "minecraft:wooden_pickaxe": 0,
+  "minecraft:stone_pickaxe": 1,
+  "minecraft:copper_pickaxe": 1,
+  "minecraft:golden_pickaxe": 1,
+  "minecraft:iron_pickaxe": 2,
+  "minecraft:diamond_pickaxe": 3,
+  "minecraft:netherite_pickaxe": 4,
+};
+
+// 各等级的候选镐（同等级按此顺序检索）
+const PICKAXE_BY_LEVEL = [
+  ["minecraft:wooden_pickaxe"],
+  [
+    "minecraft:stone_pickaxe",
+    "minecraft:copper_pickaxe",
+    "minecraft:golden_pickaxe",
+  ],
+  ["minecraft:iron_pickaxe"],
+  ["minecraft:diamond_pickaxe"],
+  ["minecraft:netherite_pickaxe"],
 ];
 
 const BLOCK_MIN_LEVEL = {
@@ -112,7 +128,7 @@ export function autoSelectPickaxe(player, blockTypeId) {
   const selectedSlot = player.selectedSlotIndex;
   const held = inv.getItem(selectedSlot);
   if (held) {
-    const lvl = PICKAXE_CHAIN.indexOf(held.typeId);
+    const lvl = PICKAXE_LEVEL[held.typeId];
     if (lvl >= required) return; // 当前工具已够用
   }
 
@@ -132,15 +148,18 @@ export function autoSelectPickaxe(player, blockTypeId) {
   // 从所需等级开始找最低级合适镐（链内等级越低越优先）
   let found = null;
   let foundSlot = -1;
-  for (let level = required; level < PICKAXE_CHAIN.length; level++) {
-    for (let i = 0; i < inv.size; i++) {
-      if (i === selectedSlot) continue;
-      const item = inv.getItem(i);
-      if (item?.typeId === PICKAXE_CHAIN[level]) {
-        found = item;
-        foundSlot = i;
-        break;
+  for (let level = required; level < PICKAXE_BY_LEVEL.length; level++) {
+    for (const typeId of PICKAXE_BY_LEVEL[level]) {
+      for (let i = 0; i < inv.size; i++) {
+        if (i === selectedSlot) continue;
+        const item = inv.getItem(i);
+        if (item?.typeId === typeId) {
+          found = item;
+          foundSlot = i;
+          break;
+        }
       }
+      if (found) break;
     }
     if (found) break;
   }
