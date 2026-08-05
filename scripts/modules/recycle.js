@@ -3,8 +3,6 @@ import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/serve
 import { countItem, removeItems } from "../lib/inventory.js";
 import { getPlayerMoney } from "./money.js";
 import {
-  RECYCLE_WINDOW,
-  RECYCLE_TAIL,
   RECYCLE_DAILY_CAP,
   RECYCLE_CUM_PREFIX,
 } from "./config.js";
@@ -93,6 +91,17 @@ const RECYCLE_CATEGORIES = {
   },
 };
 
+// --- 阶梯降价：原价窗口 16万 → 每次降价窗口 8万/4万/2万/1万 → 归零 ---
+// 每档单价 = 基础价 × 对应系数（默认每次减半）
+const RECYCLE_PRICE_STEPS = [
+  { at: 160000, factor: 1 }, // 原价窗口
+  { at: 240000, factor: 0.5 }, // 第一次降价窗口（+8万）
+  { at: 280000, factor: 0.25 }, // 第二次降价窗口（+4万）
+  { at: 300000, factor: 0.125 }, // 第三次降价窗口（+2万）
+  { at: 310000, factor: 0.0625 }, // 第四次降价窗口（+1万）
+  // 达到 310000 后价格为 0
+];
+
 // --- 回收动态定价：按个人当日累计回收金额边际递减 ---
 function getTodayStr() {
   const d = new Date(Date.now() + 8 * 60 * 60 * 1000);
@@ -133,11 +142,12 @@ function addRecycleCum(player, typeId, amount) {
 }
 
 function getRecyclePrice(basePrice, cumAmount) {
-  // 原价窗口内保持基础价；超出后按指数陡降，价格归零前最多再赚 RECYCLE_TAIL
-  if (cumAmount >= RECYCLE_DAILY_CAP) return 0;
-  if (cumAmount < RECYCLE_WINDOW) return basePrice;
-  const K = RECYCLE_TAIL / Math.log(basePrice);
-  return Math.floor(basePrice * Math.exp(-(cumAmount - RECYCLE_WINDOW) / K));
+  for (const step of RECYCLE_PRICE_STEPS) {
+    if (cumAmount < step.at) {
+      return Math.floor(basePrice * step.factor);
+    }
+  }
+  return 0;
 }
 
 function getRecyclePriceInfo(basePrice, cumAmount) {
@@ -146,18 +156,12 @@ function getRecyclePriceInfo(basePrice, cumAmount) {
   let nextAmount = null;
   let nextPrice = null;
   if (!atFloor) {
-    if (cumAmount < RECYCLE_WINDOW) {
-      nextAmount = RECYCLE_WINDOW + 1;
-    } else {
-      for (let t = cumAmount + 1; t <= RECYCLE_DAILY_CAP; t++) {
-        if (getRecyclePrice(basePrice, t) < price) {
-          nextAmount = t;
-          break;
-        }
+    for (const step of RECYCLE_PRICE_STEPS) {
+      if (step.at > cumAmount) {
+        nextAmount = step.at;
+        nextPrice = getRecyclePrice(basePrice, step.at);
+        break;
       }
-    }
-    if (nextAmount !== null) {
-      nextPrice = getRecyclePrice(basePrice, nextAmount);
     }
   }
   return { price, cumAmount, nextAmount, nextPrice, atFloor };

@@ -76,9 +76,8 @@ export const TRANSFER_TAX_RATE = 0.05; // 转账税（由转出方额外支付�
 export const SIGNIN_BASE_REWARD = 2000; // 签到基础奖励
 export const SIGNIN_STREAK_REWARD = 500; // 每连续一天追加奖励
 export const SIGNIN_MAX_REWARD = 5000; // 签到奖励上限
-export const RECYCLE_WINDOW = 100000; // 原价窗口：每种物品当日累计金币达到该值前保持原价
-export const RECYCLE_TAIL = 100000; // 超出窗口后指数衰减，价格归零前最多再赚的金币
-export const RECYCLE_DAILY_CAP = RECYCLE_WINDOW + RECYCLE_TAIL; // 每种物品当日收益上限
+export const RECYCLE_WINDOW = 160000; // 原价窗口：每种物品当日累计金币达到该值前保持原价
+export const RECYCLE_DAILY_CAP = 310000; // 第五次降价后归零，单种物品当日收益上限
 export const RECYCLE_CUM_PREFIX = "recycle:cum_"; // 个人当日回收累计金额（按玩家存储 JSON）
 
 // --- 死亡惩罚 ---
