@@ -107,6 +107,7 @@ function exitSoul(player, reason) {
 }
 
 function restoreAfterReload(player) {
+  if (!player) return;
   if (world.getDynamicProperty(SOUL_KEY + player.id)) {
     exitSoul(player, "脚本重载");
   }
@@ -145,7 +146,7 @@ export function init() {
   // 脚本重载后恢复在线玩家
   world.afterEvents.worldLoad.subscribe(() => {
     for (const p of world.getPlayers()) {
-      restoreAfterReload(p);
+      if (p) restoreAfterReload(p);
     }
   });
 
