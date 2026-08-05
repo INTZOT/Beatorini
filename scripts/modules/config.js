@@ -68,7 +68,7 @@ export const MARKET_SOLD_PREFIX = "market:sold_";
 export const MARKET_RETURNS_PREFIX = "market:returns_";
 export const MARKET_UNLOCKED_PREFIX = "market:unlocked_";
 export const MARKET_COUNTER_KEY = "market:counter";
-export const MARKET_UNLOCK_COST = 200000;
+export const MARKET_UNLOCK_COST = 20000;
 
 // --- 经济系统 ---
 export const MARKET_TAX_RATE = 0.05; // 市场交易税（成交时从卖家到账中扣除）
