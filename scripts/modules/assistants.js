@@ -125,10 +125,8 @@ export function autoSelectPickaxe(player, blockTypeId) {
 
   const selectedSlot = player.selectedSlotIndex;
   const held = inv.getItem(selectedSlot);
-  if (held) {
-    const lvl = PICKAXE_LEVEL[held.typeId];
-    if (lvl >= required) return; // 当前工具已够用
-  }
+  const heldLevel = held ? PICKAXE_LEVEL[held.typeId] : -1;
+  if (heldLevel === required) return; // 当前工具恰好满足
 
   // 从所需等级开始找最低级合适镐（链内等级越低越优先）
   let found = null;
@@ -149,11 +147,15 @@ export function autoSelectPickaxe(player, blockTypeId) {
     if (found) break;
   }
   if (!found) return; // 检索失败不做处理
+  const foundLevel = PICKAXE_LEVEL[found.typeId];
 
-  // 交换：主手槽 ← 找到的镐，原槽位 ← 原主手物品
-  const original = inv.getItem(selectedSlot);
-  inv.setItem(foundSlot, original ?? undefined);
-  inv.setItem(selectedSlot, found);
+  // 主手不足：切换为更高级工具；
+  // 主手过剩：背包存在更低级合适工具则降级切换（节省高级耐久）
+  if (heldLevel < required || foundLevel < heldLevel) {
+    const original = inv.getItem(selectedSlot);
+    inv.setItem(foundSlot, original ?? undefined);
+    inv.setItem(selectedSlot, found);
+  }
 }
 
 export function init() {
