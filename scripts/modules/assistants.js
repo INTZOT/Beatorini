@@ -43,7 +43,7 @@ const BLOCK_MIN_LEVEL = {
   "minecraft:cobblestone": 0,
   "minecraft:coal_ore": 0,
   "minecraft:copper_ore": 1,
-  "minecraft:quartz_ore": 0,
+  "minecraft:quartz_ore": 1,
   "minecraft:iron_ore": 1,
   "minecraft:gold_ore": 2,
   "minecraft:redstone_ore": 2,
