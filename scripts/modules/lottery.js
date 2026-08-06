@@ -403,6 +403,7 @@ function showPoolDetailsForm(player, pool, backFn) {
     f = f.spacer();
     for (const reward of list) {
       f = f.label(`${meta.color}${reward.label}`);
+      f = f.spacer();
     }
     f = f.spacer();
   }
