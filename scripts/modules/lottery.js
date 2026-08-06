@@ -103,6 +103,7 @@ const SPAWN_EGG_REWARDS = [
   ["minecraft:warden_spawn_egg", "监守者刷怪蛋", "rare"],
   ["minecraft:witch_spawn_egg", "女巫刷怪蛋", "common"],
   ["minecraft:wither_skeleton_spawn_egg", "凋灵骷髅刷怪蛋", "rare"],
+  ["minecraft:wither_spawn_egg", "凋灵刷怪蛋", "legendary"],
   ["minecraft:wolf_spawn_egg", "狼刷怪蛋", "rare"],
   ["minecraft:zoglin_spawn_egg", "僵尸疣猪兽刷怪蛋", "rare"],
   ["minecraft:zombie_horse_spawn_egg", "僵尸马刷怪蛋", "rare"],
