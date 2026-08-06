@@ -19,7 +19,7 @@ import {
   MARKET_VAULT_TICKINGAREA,
 } from "./config.js";
 
-function getVaultCount() {
+export function getVaultCount() {
   return world.getDynamicProperty(MARKET_VAULT_COUNT_KEY) ?? 0;
 }
 function setVaultCount(count) {
@@ -220,10 +220,9 @@ async function setupVault(retry = 0) {
       );
     }
 
-    const entities = ensureVaultEntities();
-    console.warn(
-      `[Vault] 金库就绪：${entities.length} 个实体，${entities.length * MARKET_VAULT_SLOTS} 个槽位`
-    );
+    // 等待区块与实体加载后再确保/创建实体，
+    // 避免把“暂未加载”误判为“实体缺失”而重复生成空实体
+    ensureVaultEntitiesAfterLoad(0);
   } catch (e) {
     if (retry < 5) {
       system.runTimeout(() => {
@@ -233,6 +232,20 @@ async function setupVault(retry = 0) {
       console.error(`[Vault] Init failed: ${e}`);
     }
   }
+}
+
+/** 等待金库实体加载完成后再执行 ensureVaultEntities */
+function ensureVaultEntitiesAfterLoad(attempt) {
+  const expected = getVaultCount();
+  const found = getVaultEntities().length;
+  if (expected > 0 && found < expected && attempt < 20) {
+    system.runTimeout(() => ensureVaultEntitiesAfterLoad(attempt + 1), 10);
+    return;
+  }
+  const entities = ensureVaultEntities();
+  console.warn(
+    `[Vault] 金库就绪：${entities.length} 个实体，${entities.length * MARKET_VAULT_SLOTS} 个槽位`
+  );
 }
 
 // ============================================================

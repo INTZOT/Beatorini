@@ -69,6 +69,7 @@ export const MARKET_RETURNS_PREFIX = "market:returns_";
 export const MARKET_UNLOCKED_PREFIX = "market:unlocked_";
 export const MARKET_COUNTER_KEY = "market:counter";
 export const MARKET_UNLOCK_COST = 20000;
+export const MARKET_QUARANTINE_KEY = "market:quarantine"; // 对账移除的异常清单隔离区（供管理员恢复）
 
 // --- 经济系统 ---
 export const MARKET_TAX_RATE = 0.05; // 市场交易税（成交时从卖家到账中扣除）

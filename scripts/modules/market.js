@@ -2,8 +2,8 @@ import { system, world, ItemTypes, BlockTypes } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
 import { countItem, removeItems, giveItemToPlayer } from "../lib/inventory.js";
 import { getPlayerMoney } from "./money.js";
-import { storeItem, takeItem, getVaultEntities } from "./vault.js";
-import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_VAULT_INDEX_KEY } from "./config.js";
+import { storeItem, takeItem, getVaultEntities, getVaultCount } from "./vault.js";
+import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_VAULT_INDEX_KEY, MARKET_QUARANTINE_KEY } from "./config.js";
 
 // ============================================================
 // 市场数据操作
@@ -15,6 +15,13 @@ function getMarketListings() {
 }
 function setMarketListings(listings) {
   world.setDynamicProperty(MARKET_LISTINGS_KEY, JSON.stringify(listings));
+}
+function getMarketQuarantine() {
+  const raw = world.getDynamicProperty(MARKET_QUARANTINE_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+function setMarketQuarantine(list) {
+  world.setDynamicProperty(MARKET_QUARANTINE_KEY, JSON.stringify(list));
 }
 function nextListingId() {
   let c = world.getDynamicProperty(MARKET_COUNTER_KEY) ?? 0;
@@ -555,8 +562,38 @@ function onPlayerJoin(player) {
 // ============================================================
 export function init() {
   system.beforeEvents.startup.subscribe(() => {
-    system.runTimeout(() => reconcileMarketVault(), 20);
+    system.runTimeout(() => scheduleMarketReconcile(0), 20);
   });
+}
+
+/**
+ * 等待金库实体确认加载完成后再对账。
+ * 金库加载不出来（或存在商品但金库计数异常）时保留全部清单，避免误删商品。
+ */
+function scheduleMarketReconcile(attempt) {
+  const expected = getVaultCount();
+  const found = getVaultEntities().length;
+  const listings = getMarketListings();
+
+  if (expected > 0 && found < expected) {
+    if (attempt < 60) {
+      system.runTimeout(() => scheduleMarketReconcile(attempt + 1), 20);
+      return;
+    }
+    console.error(
+      `[Market] 金库实体未完全加载（${found}/${expected}），跳过启动对账以保留全部商品清单`
+    );
+    return;
+  }
+
+  if (listings.length > 0 && expected === 0 && found === 0) {
+    console.error(
+      "[Market] 存在商品清单但金库计数为 0，跳过启动对账以保留全部商品清单"
+    );
+    return;
+  }
+
+  reconcileMarketVault();
 }
 
 function reconcileMarketVault() {
@@ -603,13 +640,13 @@ function reconcileMarketVault() {
     }
 
     const kept = [];
-    let removed = 0;
+    const removed = [];
     for (const l of listings) {
       const key = `${l.vault?.index}:${l.vault?.slot}`;
       if (occupied.has(key)) {
         kept.push(l);
       } else {
-        removed++;
+        removed.push(l);
         const seller = [...world.getPlayers()].find(
           (p) => p.id === l.sellerId
         );
@@ -619,7 +656,7 @@ function reconcileMarketVault() {
               rawtext: [
                 { text: "§c市场：你的商品「" },
                 getListingDisplayName(l),
-                { text: "」数据异常，已自动下架" },
+                { text: "」在金库中未找到，已自动下架并隔离，请联系管理员" },
               ],
             }
           );
@@ -628,12 +665,24 @@ function reconcileMarketVault() {
     }
     setMarketListings(kept);
 
+    if (removed.length > 0) {
+      const quarantine = getMarketQuarantine();
+      for (const l of removed) {
+        quarantine.push({
+          ...l,
+          removedAt: Date.now(),
+          reason: "startup_vault_missing",
+        });
+      }
+      setMarketQuarantine(quarantine);
+    }
+
     const orphanCount = [...occupied.keys()].filter(
       (key) => !claimed.has(key)
     ).length;
-    if (removed > 0 || orphanCount > 0) {
+    if (removed.length > 0 || orphanCount > 0) {
       console.warn(
-        `[Market] 对账完成：移除 ${removed} 个异常清单，${orphanCount} 个孤儿物品保留在金库`
+        `[Market] 对账完成：移除 ${removed.length} 个异常清单（已隔离），${orphanCount} 个孤儿物品保留在金库`
       );
     }
   } catch (e) {
