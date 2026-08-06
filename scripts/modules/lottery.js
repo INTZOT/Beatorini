@@ -1,15 +1,15 @@
 // ============================================================
 // 抽奖模块
 // 主菜单 → 抽奖 → 奖池列表 → 单抽 / 十连
-// 首个奖池：刷怪蛋奖池（85 种原版刷怪蛋，单抽 100,000 金币）
-// 十连 = 10 × 单抽价格，并保底至少 1 个史诗及以上奖励
+// 首个奖池：刷怪蛋奖池（86 种原版刷怪蛋，单抽 100,000 金币）
+// 硬保底：10 抽必出史诗（含）以上，100 抽必出传说；抽中对应稀有度即重置计数
 // ============================================================
-import { system, ItemStack } from "@minecraft/server";
+import { system, world, ItemStack } from "@minecraft/server";
 import { CustomForm } from "@minecraft/server-ui";
 import { getPlayerMoney } from "./money.js";
 
 // --- 稀有度配置 ---
-const RARITY_ORDER = ["common", "rare", "epic", "rare"];
+const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 const RARITY = {
   common: { label: "普通", color: "§7", weight: 100 },
   rare: { label: "稀有", color: "§9", weight: 28 },
@@ -19,8 +19,12 @@ const RARITY = {
 
 // --- 十连参数 ---
 const TEN_PULL_COUNT = 10;
-// 十连保底：至少出现一个该稀有度（含）以上的奖励
-const TEN_PULL_GUARANTEE_RARITY = "epic";
+
+// --- 硬保底参数（按玩家累计抽数计算，抽中即重置） ---
+const PITY_EPIC_THRESHOLD = 10;
+const PITY_LEGENDARY_THRESHOLD = 100;
+const LOTTERY_PITY_EPIC_PREFIX = "lottery:pity_epic_";
+const LOTTERY_PITY_LEGENDARY_PREFIX = "lottery:pity_legendary_";
 
 // --- 刷怪蛋奖池内容 ---
 // [物品 ID, 中文名, 稀有度]
@@ -146,6 +150,8 @@ function pickReward(pool, minIndex = 0) {
   const eligible = pool.rewards.filter(
     (r) => getRarityIndex(r.rarity) >= minIndex
   );
+  // 奖池内没有对应稀有度时回退到全奖池抽取
+  if (eligible.length === 0) return pickReward(pool, 0);
   const total = eligible.reduce(
     (sum, r) => sum + RARITY[r.rarity].weight,
     0
@@ -191,6 +197,63 @@ function deductMoney(player, amount) {
 }
 
 // ============================================================
+// 硬保底
+// ============================================================
+
+function getPity(player, prefix) {
+  const value = world.getDynamicProperty(prefix + player.id);
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function setPity(player, prefix, value) {
+  world.setDynamicProperty(prefix + player.id, value);
+}
+
+function getPityInfo(player) {
+  return {
+    epic: getPity(player, LOTTERY_PITY_EPIC_PREFIX),
+    legendary: getPity(player, LOTTERY_PITY_LEGENDARY_PREFIX),
+  };
+}
+
+/**
+ * 单次抽取：应用硬保底并更新保底计数。
+ * 返回 { reward, pityType }，pityType 为 "epic"/"legendary"/null。
+ */
+function drawOneWithPity(player, pool) {
+  let epicPity = getPity(player, LOTTERY_PITY_EPIC_PREFIX);
+  let legendaryPity = getPity(player, LOTTERY_PITY_LEGENDARY_PREFIX);
+  let reward;
+  let pityType = null;
+
+  if (legendaryPity >= PITY_LEGENDARY_THRESHOLD - 1) {
+    reward = pickReward(pool, getRarityIndex("legendary"));
+    pityType = "legendary";
+  } else if (epicPity >= PITY_EPIC_THRESHOLD - 1) {
+    reward = pickReward(pool, getRarityIndex("epic"));
+    pityType = "epic";
+  } else {
+    reward = pickReward(pool);
+  }
+
+  // 抽中传说同时重置史诗保底（传说高于史诗）；抽中史诗只重置史诗保底
+  if (reward.rarity === "legendary") {
+    legendaryPity = 0;
+    epicPity = 0;
+  } else if (reward.rarity === "epic") {
+    epicPity = 0;
+    legendaryPity += 1;
+  } else {
+    epicPity += 1;
+    legendaryPity += 1;
+  }
+
+  setPity(player, LOTTERY_PITY_EPIC_PREFIX, epicPity);
+  setPity(player, LOTTERY_PITY_LEGENDARY_PREFIX, legendaryPity);
+  return { reward, pityType };
+}
+
+// ============================================================
 // 抽奖逻辑
 // ============================================================
 
@@ -202,10 +265,10 @@ function drawOnce(player, pool, backFn) {
     showPoolMenu(player, pool, backFn);
     return;
   }
-  const reward = pickReward(pool);
-  const dropped = giveReward(player, reward);
-  playRaritySound(player, reward.rarity);
-  showDrawResultForm(player, pool, [reward], dropped, false, backFn);
+  const drawn = drawOneWithPity(player, pool);
+  const dropped = giveReward(player, drawn.reward);
+  playRaritySound(player, drawn.reward.rarity);
+  showDrawResultForm(player, pool, [drawn], dropped, false, backFn);
 }
 
 function drawTen(player, pool, backFn) {
@@ -219,21 +282,17 @@ function drawTen(player, pool, backFn) {
 
   const results = [];
   for (let i = 0; i < TEN_PULL_COUNT; i++) {
-    results.push(pickReward(pool));
-  }
-
-  // 十连保底：至少一个史诗及以上
-  const guaranteeIndex = getRarityIndex(TEN_PULL_GUARANTEE_RARITY);
-  if (!results.some((r) => getRarityIndex(r.rarity) >= guaranteeIndex)) {
-    results[TEN_PULL_COUNT - 1] = pickReward(pool, guaranteeIndex);
+    results.push(drawOneWithPity(player, pool));
   }
 
   let dropped = 0;
-  for (const reward of results) {
-    dropped += giveReward(player, reward);
+  for (const drawn of results) {
+    dropped += giveReward(player, drawn.reward);
   }
 
-  const bestIndex = Math.max(...results.map((r) => getRarityIndex(r.rarity)));
+  const bestIndex = Math.max(
+    ...results.map((r) => getRarityIndex(r.reward.rarity))
+  );
   playRaritySound(player, RARITY_ORDER[bestIndex]);
   showDrawResultForm(player, pool, results, dropped, true, backFn);
 }
@@ -245,7 +304,10 @@ function drawTen(player, pool, backFn) {
 function showDrawResultForm(player, pool, results, dropped, isTen, backFn) {
   // 相同奖励合并显示
   const grouped = new Map();
-  for (const reward of results) {
+  const pityTriggered = new Set();
+  for (const drawn of results) {
+    const reward = drawn.reward;
+    if (drawn.pityType) pityTriggered.add(drawn.pityType);
     const cur = grouped.get(reward.typeId) || { reward, count: 0 };
     cur.count++;
     grouped.set(reward.typeId, cur);
@@ -258,6 +320,14 @@ function showDrawResultForm(player, pool, results, dropped, isTen, backFn) {
   for (const { reward, count } of grouped.values()) {
     const rarity = RARITY[reward.rarity];
     f = f.label(`${rarity.color}${rarity.label} ×${count}  ${reward.label}`);
+    f = f.spacer();
+  }
+
+  if (pityTriggered.has("legendary")) {
+    f = f.label("§6◆ 触发传说保底！");
+    f = f.spacer();
+  } else if (pityTriggered.has("epic")) {
+    f = f.label("§d◆ 触发史诗保底！");
     f = f.spacer();
   }
 
@@ -283,24 +353,25 @@ function showDrawResultForm(player, pool, results, dropped, isTen, backFn) {
 
 function showPoolMenu(player, pool, backFn) {
   const tenCost = pool.singleCost * TEN_PULL_COUNT;
-  const guaranteeLabel = RARITY[TEN_PULL_GUARANTEE_RARITY].label;
+  const pity = getPityInfo(player);
   let f = new CustomForm(player, `${pool.icon} ${pool.name}`);
   f = f.label(`§6当前金币: ${formatNumber(getPlayerMoney(player))}`);
   f = f.spacer();
   f = f.label(pool.description);
+  f = f.spacer();
+  f = f.label(
+    `§7史诗保底: ${pity.epic}/${PITY_EPIC_THRESHOLD}  传说保底: ${pity.legendary}/${PITY_LEGENDARY_THRESHOLD}`
+  );
   f = f.spacer();
   f = f.button(`单抽一次  ${formatNumber(pool.singleCost)}`, () => {
     f.close();
     system.runTimeout(() => drawOnce(player, pool, backFn), 2);
   });
   f = f.spacer();
-  f = f.button(
-    `十连抽  ${formatNumber(tenCost)}  §7(保底${guaranteeLabel}+)`,
-    () => {
-      f.close();
-      system.runTimeout(() => drawTen(player, pool, backFn), 2);
-    }
-  );
+  f = f.button(`十连抽  ${formatNumber(tenCost)}`, () => {
+    f.close();
+    system.runTimeout(() => drawTen(player, pool, backFn), 2);
+  });
   f = f.spacer();
   f = f.button("返回奖池列表", () => {
     f.close();
