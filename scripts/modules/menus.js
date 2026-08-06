@@ -28,6 +28,7 @@ import { showRecycleCategoryMenu } from "./recycle.js";
 import { showSigninForm } from "./signin.js";
 import { showAssistantMenu, getAssistSettings } from "./assistants.js";
 import { debugVault } from "./vault.js";
+import { showLotteryMenu } from "./lottery.js";
 import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
 
 // ============================================================
@@ -88,6 +89,10 @@ function showIslandMenu(player) {
   f = f.button("交易", () => {
     f.close();
     system.runTimeout(() => showTradeSubMenu(player), 2);
+  });
+  f = f.button("抽奖", () => {
+    f.close();
+    system.runTimeout(() => showLotteryMenu(player, showIslandMenu), 2);
   });
   f.show().catch((e) => console.warn("Form show failed:", e));
 }
