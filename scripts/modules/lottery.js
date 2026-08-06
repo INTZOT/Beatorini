@@ -389,7 +389,7 @@ export function showLotteryMenu(player, backFn = () => {}) {
 
   for (const pool of LOTTERY_POOLS) {
     f = f.button(
-      `${pool.icon} ${pool.name}  §7单抽 ${formatNumber(pool.singleCost)}`,
+      `${pool.icon} ${pool.name}  单抽 ${formatNumber(pool.singleCost)}`,
       () => {
         f.close();
         system.runTimeout(() => showPoolMenu(player, pool, backFn), 2);
