@@ -11,9 +11,9 @@ import { getPlayerMoney } from "./money.js";
 // --- 稀有度配置 ---
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 const RARITY = {
-  common: { label: "普通", color: "§7", weight: 166 },
-  rare: { label: "稀有", color: "§9", weight: 44 },
-  epic: { label: "史诗", color: "§d", weight: 3 },
+  common: { label: "普通", color: "§7", weight: 740 },
+  rare: { label: "稀有", color: "§9", weight: 249 },
+  epic: { label: "史诗", color: "§d", weight: 10 },
   legendary: { label: "传说", color: "§6", weight: 1 },
 };
 
@@ -145,23 +145,35 @@ function getRarityIndex(rarity) {
   return RARITY_ORDER.indexOf(rarity);
 }
 
-/** 从奖池中按权重抽取一个奖励（minIndex 为最低稀有度下标） */
+/**
+ * 从奖池中抽取一个奖励。
+ * 先按稀有度整体权重抽取稀有度（minIndex 为最低稀有度下标），
+ * 再在该稀有度内随机选择一个物品，保证各稀有度整体概率精确可配。
+ */
 function pickReward(pool, minIndex = 0) {
-  const eligible = pool.rewards.filter(
-    (r) => getRarityIndex(r.rarity) >= minIndex
+  const eligibleRarities = RARITY_ORDER.filter(
+    (rarity, i) =>
+      i >= minIndex && pool.rewards.some((r) => r.rarity === rarity)
   );
   // 奖池内没有对应稀有度时回退到全奖池抽取
-  if (eligible.length === 0) return pickReward(pool, 0);
-  const total = eligible.reduce(
-    (sum, r) => sum + RARITY[r.rarity].weight,
+  if (eligibleRarities.length === 0) return pickReward(pool, 0);
+
+  const total = eligibleRarities.reduce(
+    (sum, rarity) => sum + RARITY[rarity].weight,
     0
   );
   let roll = Math.random() * total;
-  for (const reward of eligible) {
-    roll -= RARITY[reward.rarity].weight;
-    if (roll < 0) return reward;
+  let chosenRarity = eligibleRarities[eligibleRarities.length - 1];
+  for (const rarity of eligibleRarities) {
+    roll -= RARITY[rarity].weight;
+    if (roll < 0) {
+      chosenRarity = rarity;
+      break;
+    }
   }
-  return eligible[eligible.length - 1];
+
+  const candidates = pool.rewards.filter((r) => r.rarity === chosenRarity);
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 function playRaritySound(player, rarity) {
