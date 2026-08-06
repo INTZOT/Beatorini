@@ -141,6 +141,11 @@ function formatNumber(n) {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+function formatPercent(value) {
+  const rounded = Math.round(value * 1000) / 1000;
+  return `${parseFloat(rounded.toFixed(3))}%`;
+}
+
 function getRarityIndex(rarity) {
   return RARITY_ORDER.indexOf(rarity);
 }
@@ -403,6 +408,13 @@ function showPoolDetailsForm(player, pool, backFn) {
     if (!groups[reward.rarity]) groups[reward.rarity] = [];
     groups[reward.rarity].push(reward);
   }
+  const presentRarities = RARITY_ORDER.filter(
+    (rarity) => (groups[rarity] || []).length > 0
+  );
+  const totalWeight = presentRarities.reduce(
+    (sum, rarity) => sum + RARITY[rarity].weight,
+    0
+  );
 
   let f = new CustomForm(player, `${pool.icon} ${pool.name} · 奖池详情`);
   f = f.label(`§6奖池内共 ${pool.rewards.length} 种物品`);
@@ -410,8 +422,10 @@ function showPoolDetailsForm(player, pool, backFn) {
 
   for (const rarity of [...RARITY_ORDER].reverse()) {
     const list = groups[rarity] || [];
+    if (list.length === 0) continue;
     const meta = RARITY[rarity];
-    f = f.label(`${meta.color}§l${meta.label} (${list.length})`);
+    const percent = formatPercent((meta.weight / totalWeight) * 100);
+    f = f.label(`${meta.color}§l${meta.label} (${list.length})  §7${percent}`);
     f = f.spacer();
     for (const reward of list) {
       f = f.label(`${meta.color}${reward.label}`);
