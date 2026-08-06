@@ -11,10 +11,10 @@ import { getPlayerMoney } from "./money.js";
 // --- 稀有度配置 ---
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
 const RARITY = {
-  common: { label: "普通", color: "§7", weight: 100 },
-  rare: { label: "稀有", color: "§9", weight: 28 },
-  epic: { label: "史诗", color: "§d", weight: 8 },
-  legendary: { label: "传说", color: "§6", weight: 2 },
+  common: { label: "普通", color: "§7", weight: 166 },
+  rare: { label: "稀有", color: "§9", weight: 44 },
+  epic: { label: "史诗", color: "§d", weight: 3 },
+  legendary: { label: "传说", color: "§6", weight: 1 },
 };
 
 // --- 十连参数 ---
