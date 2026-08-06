@@ -373,11 +373,45 @@ function showPoolMenu(player, pool, backFn) {
     system.runTimeout(() => drawTen(player, pool, backFn), 2);
   });
   f = f.spacer();
+  f = f.button("查看奖池详情", () => {
+    f.close();
+    system.runTimeout(() => showPoolDetailsForm(player, pool, backFn), 2);
+  });
+  f = f.spacer();
   f = f.button("返回奖池列表", () => {
     f.close();
     system.runTimeout(() => showLotteryMenu(player, backFn), 2);
   });
   f.show().catch((e) => console.warn("Lottery pool form failed:", e));
+}
+
+function showPoolDetailsForm(player, pool, backFn) {
+  const groups = {};
+  for (const reward of pool.rewards) {
+    if (!groups[reward.rarity]) groups[reward.rarity] = [];
+    groups[reward.rarity].push(reward);
+  }
+
+  let f = new CustomForm(player, `${pool.icon} ${pool.name} · 奖池详情`);
+  f = f.label(`§6奖池内共 ${pool.rewards.length} 种物品`);
+  f = f.spacer();
+
+  for (const rarity of [...RARITY_ORDER].reverse()) {
+    const list = groups[rarity] || [];
+    const meta = RARITY[rarity];
+    f = f.label(`${meta.color}§l${meta.label} (${list.length})`);
+    f = f.spacer();
+    for (const reward of list) {
+      f = f.label(`${meta.color}${reward.label}`);
+    }
+    f = f.spacer();
+  }
+
+  f = f.button("返回奖池", () => {
+    f.close();
+    system.runTimeout(() => showPoolMenu(player, pool, backFn), 2);
+  });
+  f.show().catch((e) => console.warn("Lottery pool details form failed:", e));
 }
 
 export function showLotteryMenu(player, backFn = () => {}) {
