@@ -70,7 +70,7 @@ const SPAWN_EGG_REWARDS = [
   ["minecraft:mule_spawn_egg", "骡刷怪蛋", "rare"],
   ["minecraft:nautilus_spawn_egg", "鹦鹉螺刷怪蛋", "common"],
   ["minecraft:ocelot_spawn_egg", "豹猫刷怪蛋", "epic"],
-  ["minecraft:panda_spawn_egg", "熊猫刷怪蛋", "epic"],
+  ["minecraft:panda_spawn_egg", "熊猫刷怪蛋", "legendary"],
   ["minecraft:parched_spawn_egg", "焦骸刷怪蛋", "rare"],
   ["minecraft:parrot_spawn_egg", "鹦鹉刷怪蛋", "epic"],
   ["minecraft:phantom_spawn_egg", "幻翼刷怪蛋", "common"],
