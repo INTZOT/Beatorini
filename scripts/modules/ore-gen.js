@@ -74,14 +74,16 @@ export function init() {
     // 动态概率：每次未出矿挖掘固定 +0.05%（0.0005），第 2000 次挖掘达到 100%
     const baseChance = 0.002;
     const currentChance = Math.min(baseChance + streak * 0.0005, 1.0);
-    // ActionBar：当前累计出矿概率 + 进度条（当前/最大 100%）
+    // 进度条满格对应的概率（10%）：实际出矿基本在 10% 前必出，满格即可视作接近必出
+    const BAR_FULL_CHANCE = 0.1;
+    // ActionBar：当前累计出矿概率 + 进度条（满格 = 10%）
     const pct = Math.round(Math.min(currentChance, 1) * 1000) / 10;
-    const ratio = Math.min(1, currentChance);
+    const ratio = Math.min(1, currentChance / BAR_FULL_CHANCE);
     const filled = Math.round(ratio * 20);
     const bar =
       "§a" + "█".repeat(filled) + "§7" + "█".repeat(20 - filled);
     player.onScreenDisplay.setActionBar(
-      `§e当前出矿概率: §f${pct}%  §8(最大 100%)\n${bar} §f${filled}/20`
+      `§e当前出矿概率: §f${pct}%  §8(满格 = 10%)\n${bar} §f${filled}/20`
     );
 
     if (Math.random() >= currentChance) {
