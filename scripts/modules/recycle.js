@@ -51,7 +51,7 @@ const RECYCLE_CATEGORIES = {
       { label: "钻石", typeId: "minecraft:diamond", price: 6400 },
       { label: "绿宝石", typeId: "minecraft:emerald", price: 3200 },
       { label: "下界残骸", typeId: "minecraft:ancient_debris", price: 12800 },
-      { label: "红石", typeId: "minecraft:redstone_dust", price: 200 },
+      { label: "红石", typeId: "minecraft:redstone", price: 200 },
       { label: "青金石", typeId: "minecraft:lapis_lazuli", price: 200 },
       { label: "紫水晶碎片", typeId: "minecraft:amethyst_shard", price: 400 },
     ],
