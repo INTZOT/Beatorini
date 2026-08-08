@@ -70,7 +70,7 @@ export function showSigninForm(player) {
   function attempt() {
     if (closed || signed) return;
     try {
-      if (!player.isValid()) return;
+      if (!player.isValid) return;
     } catch (e) {
       return;
     }
