@@ -97,63 +97,75 @@ export function showSigninForm(player) {
       SIGNIN_MAX_REWARD
     );
 
-    const form = new CustomForm(player, "灯浮市Beatorini");
-    const statusText = new ObservableString(
-      alreadySigned
-        ? `§a你已连续签到 ${streak} 天！`
-        : `§e今日签到奖励: ${reward} 金币`,
-      { clientWritable: true }
-    );
-    form.label(statusText).spacer();
+    try {
+      const form = new CustomForm(player, "灯浮市Beatorini");
+      const statusText = new ObservableString(
+        alreadySigned
+          ? `§a你已连续签到 ${streak} 天！`
+          : `§e今日签到奖励: ${reward} 金币`,
+        { clientWritable: true }
+      );
+      form.label(statusText).spacer();
 
-    // --- 服务器公告 ---
-    form.label("§6§l【服务器公告】");
-    form.spacer();
-    for (const line of SERVER_ANNOUNCEMENTS) {
-      form.label(line);
+      // --- 服务器公告 ---
+      form.label("§6§l【服务器公告】");
       form.spacer();
-    }
-
-    // --- 服务器更新日志 ---
-    form.label("§6§l【服务器更新日志】");
-    form.spacer();
-    for (const entry of SERVER_CHANGELOGS) {
-      form.label(`§e${entry.version}`);
-      form.spacer();
-      for (const line of entry.items) {
+      for (const line of SERVER_ANNOUNCEMENTS) {
         form.label(line);
         form.spacer();
       }
-    }
 
-    form.button(alreadySigned ? "关闭" : "签到", () => {
-      if (signed) return;
-      signed = true;
-      if (alreadySigned) {
-        form.close();
-        return;
+      // --- 服务器更新日志 ---
+      form.label("§6§l【服务器更新日志】");
+      form.spacer();
+      for (const entry of SERVER_CHANGELOGS) {
+        form.label(`§e${entry.version}`);
+        form.spacer();
+        for (const line of entry.items) {
+          form.label(line);
+          form.spacer();
+        }
       }
-      const newStreak = streak + 1;
-      saveSigninInfo(player.id, today, newStreak);
-      player.runCommand(`scoreboard players add @s money ${reward}`);
-      player.sendMessage(
-        `§a签到成功！获得 ${reward} 金币，连续签到 ${newStreak} 天`
-      );
-      player.playSound("random.orb");
-      statusText.setData(`§a你已连续签到 ${newStreak} 天！`);
-      player.dimension.spawnEntity("minecraft:fireworks_rocket", player.location);
-      form.close();
-    });
 
-    // 进服后每 tick 检查一次：
-    // 表单成功展示时等待玩家关闭（按钮/关闭按钮/取消）后停止；
-    // 展示失败（其他界面占用等）则下一 tick 继续尝试，直到玩家关闭为止
-    try {
+      form.button(alreadySigned ? "关闭" : "签到", () => {
+        if (signed) return;
+        signed = true;
+        if (alreadySigned) {
+          form.close();
+          return;
+        }
+        const newStreak = streak + 1;
+        saveSigninInfo(player.id, today, newStreak);
+        player.runCommand(`scoreboard players add @s money ${reward}`);
+        player.sendMessage(
+          `§a签到成功！获得 ${reward} 金币，连续签到 ${newStreak} 天`
+        );
+        player.playSound("random.orb");
+        statusText.setData(`§a你已连续签到 ${newStreak} 天！`);
+        player.dimension.spawnEntity(
+          "minecraft:fireworks_rocket",
+          player.location
+        );
+        form.close();
+      });
+
+      // 进服后每 tick 检查一次：
+      // - UserBusy（玩家正忙/聊天框打开/其他界面占用）：表单未真正展示，下一 tick 继续尝试
+      // - UserClosed（玩家主动关闭）或点击按钮：停止检查
       form
         .show()
-        .then(() => {
+        .then((response) => {
           showing = false;
-          closed = true;
+          if (
+            response?.canceled &&
+            response.cancelationReason === "UserBusy"
+          ) {
+            if (!signed && !closed) {
+              system.runTimeout(attempt, 1);
+            }
+          } else {
+            closed = true;
+          }
         })
         .catch((e) => {
           showing = false;
