@@ -85,7 +85,7 @@ export function saveAchievement(playerId, itemType) {
 }
 
 export function init() {
-  // --- 成就检测（每10秒检查玩家背包） ---
+  // --- 成就检测（每3秒检查玩家背包） ---
   system.runInterval(() => {
     for (const player of world.getPlayers()) {
       const completed = getAchievements(player.id);
@@ -109,5 +109,5 @@ export function init() {
         player.playSound("random.levelup");
       }
     }
-  }, 20 * 10);
+  }, 20 * 3);
 }
