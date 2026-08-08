@@ -66,14 +66,22 @@ export function clearSignin(playerId) {
 export function showSigninForm(player) {
   let signed = false;
   let closed = false;
+  let showing = false;
+  let warned = false;
 
   function attempt() {
-    if (closed || signed) return;
+    if (closed || signed || showing) return;
     try {
-      if (!player.isValid) return;
+      if (!player.isValid) {
+        closed = true;
+        return;
+      }
     } catch (e) {
+      closed = true;
       return;
     }
+
+    showing = true;
 
     const today = getTodayStr();
     const info = getSigninInfo(player.id);
@@ -137,19 +145,36 @@ export function showSigninForm(player) {
       form.close();
     });
 
-    // 表单成功展示后，等玩家关闭（按钮/关闭按钮/取消）即停止；
-    // 展示失败则持续重试，直到玩家看到并关闭为止
-    form
-      .show()
-      .then(() => {
-        closed = true;
-      })
-      .catch((e) => {
+    // 进服后每 tick 检查一次：
+    // 表单成功展示时等待玩家关闭（按钮/关闭按钮/取消）后停止；
+    // 展示失败（其他界面占用等）则下一 tick 继续尝试，直到玩家关闭为止
+    try {
+      form
+        .show()
+        .then(() => {
+          showing = false;
+          closed = true;
+        })
+        .catch((e) => {
+          showing = false;
+          if (!warned) {
+            warned = true;
+            console.warn("Signin form failed:", e);
+          }
+          if (!signed && !closed) {
+            system.runTimeout(attempt, 1);
+          }
+        });
+    } catch (e) {
+      showing = false;
+      if (!warned) {
+        warned = true;
         console.warn("Signin form failed:", e);
-        if (!signed && !closed) {
-          system.runTimeout(attempt, 20);
-        }
-      });
+      }
+      if (!signed && !closed) {
+        system.runTimeout(attempt, 1);
+      }
+    }
   }
 
   attempt();

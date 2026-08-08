@@ -694,9 +694,8 @@ export function init() {
       }, 0);
     }
 
-    system.runTimeout(() => {
-      showSigninForm(player);
-    }, 100);
+    // 进服后立即开始检查，表单展示失败时每 tick 重试，直到玩家关闭
+    showSigninForm(player);
 
     // 市场离线收益
     marketOnPlayerJoin(player);
