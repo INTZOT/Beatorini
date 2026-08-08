@@ -661,6 +661,9 @@ export function init() {
     const spawnDim = player.dimension?.id || "?";
 
     if (!event.initialSpawn) return;
+    console.warn(
+      `[SigninDebug] playerSpawn initialSpawn player=${player.name} id=${player.id} dim=${spawnDim}`
+    );
 
     if (hasPlayerJoinedBefore(player.id)) {
       player.sendMessage(`§a玩家 ${player.name}，欢迎回来！`);
@@ -695,6 +698,7 @@ export function init() {
     }
 
     // 进服后立即开始检查，表单展示失败时每 tick 重试，直到玩家关闭
+    console.warn(`[SigninDebug] calling showSigninForm for ${player.name}`);
     showSigninForm(player);
 
     // 市场离线收益

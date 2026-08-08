@@ -36,6 +36,9 @@ const SERVER_CHANGELOGS = [
   },
 ];
 
+// --- 临时调试：定位公告弹窗问题（定位完成后删除） ---
+const DEBUG_SIGNIN = true;
+
 function getTodayStr() {
   const d = new Date(Date.now() + UTC8_OFFSET_MS);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
@@ -64,24 +67,50 @@ export function clearSignin(playerId) {
 }
 
 export function showSigninForm(player) {
+  if (DEBUG_SIGNIN) {
+    console.warn(
+      `[SigninDebug] showSigninForm entered player=${player.name} id=${player.id}`
+    );
+  }
   let signed = false;
   let closed = false;
   let showing = false;
   let warned = false;
+  let attemptCount = 0;
 
   function attempt() {
+    attemptCount++;
+    if (
+      DEBUG_SIGNIN &&
+      (attemptCount <= 30 || attemptCount % 100 === 0)
+    ) {
+      console.warn(
+        `[SigninDebug] attempt #${attemptCount} closed=${closed} signed=${signed} showing=${showing}`
+      );
+    }
     if (closed || signed || showing) return;
     try {
       if (!player.isValid) {
+        if (DEBUG_SIGNIN) {
+          console.warn(`[SigninDebug] attempt #${attemptCount} player invalid, stop`);
+        }
         closed = true;
         return;
       }
     } catch (e) {
+      if (DEBUG_SIGNIN) {
+        console.warn(
+          `[SigninDebug] attempt #${attemptCount} isValid check threw: ${e?.name} ${e?.message}`
+        );
+      }
       closed = true;
       return;
     }
 
     showing = true;
+    if (DEBUG_SIGNIN) {
+      console.warn(`[SigninDebug] attempt #${attemptCount} showing=true`);
+    }
 
     const today = getTodayStr();
     const info = getSigninInfo(player.id);
@@ -98,6 +127,11 @@ export function showSigninForm(player) {
     );
 
     try {
+      if (DEBUG_SIGNIN) {
+        console.warn(
+          `[SigninDebug] attempt #${attemptCount} building form alreadySigned=${alreadySigned} streak=${streak} reward=${reward}`
+        );
+      }
       const form = new CustomForm(player, "灯浮市Beatorini");
       const statusText = new ObservableString(
         alreadySigned
@@ -128,6 +162,11 @@ export function showSigninForm(player) {
       }
 
       form.button(alreadySigned ? "关闭" : "签到", () => {
+        if (DEBUG_SIGNIN) {
+          console.warn(
+            `[SigninDebug] attempt #${attemptCount} button clicked signed=${signed}`
+          );
+        }
         if (signed) return;
         signed = true;
         if (alreadySigned) {
@@ -156,6 +195,11 @@ export function showSigninForm(player) {
         .show()
         .then((response) => {
           showing = false;
+          if (DEBUG_SIGNIN) {
+            console.warn(
+              `[SigninDebug] attempt #${attemptCount} show resolved canceled=${response?.canceled} reason=${response?.cancelationReason}`
+            );
+          }
           if (
             response?.canceled &&
             response.cancelationReason === "UserBusy"
@@ -164,11 +208,21 @@ export function showSigninForm(player) {
               system.runTimeout(attempt, 1);
             }
           } else {
+            if (DEBUG_SIGNIN) {
+              console.warn(
+                `[SigninDebug] attempt #${attemptCount} player closed, stop`
+              );
+            }
             closed = true;
           }
         })
         .catch((e) => {
           showing = false;
+          if (DEBUG_SIGNIN) {
+            console.warn(
+              `[SigninDebug] attempt #${attemptCount} show rejected: ${e?.name} ${e?.message} ${e?.stack}`
+            );
+          }
           if (!warned) {
             warned = true;
             console.warn("Signin form failed:", e);
@@ -179,6 +233,11 @@ export function showSigninForm(player) {
         });
     } catch (e) {
       showing = false;
+      if (DEBUG_SIGNIN) {
+        console.warn(
+          `[SigninDebug] attempt #${attemptCount} build/show threw: ${e?.name} ${e?.message} ${e?.stack}`
+        );
+      }
       if (!warned) {
         warned = true;
         console.warn("Signin form failed:", e);
