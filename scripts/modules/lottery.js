@@ -117,6 +117,30 @@ const SPAWN_EGG_REWARDS = [
   ["minecraft:zombie_villager_spawn_egg", "僵尸村民刷怪蛋", "common"],
 ];
 
+// --- 下界奖池内容 ---
+// [物品 ID, 中文名, 稀有度, 单次数量]
+const NETHER_REWARDS = [
+  ["minecraft:netherrack", "地狱岩", "common", 16],
+  ["minecraft:gravel", "沙砾", "common", 16],
+  ["minecraft:soul_soil", "灵魂土", "common", 16],
+  ["minecraft:soul_sand", "灵魂沙", "common", 16],
+  ["minecraft:basalt", "玄武岩", "common", 16],
+  ["minecraft:blackstone", "黑石", "common", 16],
+  ["minecraft:magma_block", "岩浆块", "common", 16],
+  ["minecraft:crimson_nylium", "绯红菌岩", "rare", 4],
+  ["minecraft:warped_nylium", "诡异菌岩", "rare", 4],
+  ["minecraft:weeping_vines", "垂泪藤", "rare", 4],
+  ["minecraft:twisting_vines", "缠怨藤", "rare", 4],
+  ["minecraft:warped_fungus", "诡异真菌", "rare", 4],
+  ["minecraft:crimson_fungus", "绯红菌", "rare", 4],
+  ["minecraft:blaze_rod", "烈焰棒", "epic", 8],
+  ["minecraft:magma_cream", "岩浆膏", "epic", 8],
+  ["minecraft:ghast_tear", "恶魂之泪", "epic", 8],
+  ["minecraft:wither_skeleton_skull", "凋灵骷髅头", "epic", 1],
+  ["minecraft:netherite_upgrade_smithing_template", "下界合金升级模板", "legendary", 1],
+  ["minecraft:nether_wart", "下界疣", "legendary", 1],
+];
+
 // --- 奖池列表（后续新增奖池直接在此追加） ---
 const LOTTERY_POOLS = [
   {
@@ -125,10 +149,24 @@ const LOTTERY_POOLS = [
     icon: "✦",
     description: `内含 ${SPAWN_EGG_REWARDS.length} 种生物刷怪蛋，从常见家畜到稀有限定生物！`,
     singleCost: 100000,
-    rewards: SPAWN_EGG_REWARDS.map(([typeId, label, rarity]) => ({
+    rewards: SPAWN_EGG_REWARDS.map(([typeId, label, rarity, count = 1]) => ({
       typeId,
       label,
       rarity,
+      count,
+    })),
+  },
+  {
+    id: "nether",
+    name: "下界奖池",
+    icon: "☠",
+    description: `内含 ${NETHER_REWARDS.length} 种下界物资，从常见方块到稀有材料！`,
+    singleCost: 100000,
+    rewards: NETHER_REWARDS.map(([typeId, label, rarity, count = 1]) => ({
+      typeId,
+      label,
+      rarity,
+      count,
     })),
   },
 ];
@@ -198,7 +236,9 @@ function playRaritySound(player, rarity) {
 function giveReward(player, reward) {
   try {
     const inv = player.getComponent("inventory").container;
-    const leftover = inv.addItem(new ItemStack(reward.typeId, 1));
+    const leftover = inv.addItem(
+      new ItemStack(reward.typeId, reward.count ?? 1)
+    );
     return leftover?.amount ?? 0;
   } catch (e) {
     console.warn(`[Lottery] 发放 ${reward.typeId} 失败: ${e}`);
@@ -325,8 +365,10 @@ function showDrawResultForm(player, pool, results, dropped, isTen, backFn) {
   for (const drawn of results) {
     const reward = drawn.reward;
     if (drawn.pityType) pityTriggered.add(drawn.pityType);
-    const cur = grouped.get(reward.typeId) || { reward, count: 0 };
+    const cur =
+      grouped.get(reward.typeId) || { reward, count: 0, totalAmount: 0 };
     cur.count++;
+    cur.totalAmount += reward.count ?? 1;
     grouped.set(reward.typeId, cur);
   }
 
@@ -334,9 +376,13 @@ function showDrawResultForm(player, pool, results, dropped, isTen, backFn) {
   f = f.label(`§6剩余金币: ${formatNumber(getPlayerMoney(player))}`);
   f = f.spacer();
 
-  for (const { reward, count } of grouped.values()) {
+  for (const { reward, count, totalAmount } of grouped.values()) {
     const rarity = RARITY[reward.rarity];
-    f = f.label(`${rarity.color}${rarity.label} ×${count}  ${reward.label}`);
+    let line = `${rarity.color}${rarity.label} ×${count}  ${reward.label}`;
+    if ((reward.count ?? 1) > 1) {
+      line += ` §7(${totalAmount}个)`;
+    }
+    f = f.label(line);
     f = f.spacer();
   }
 
@@ -428,7 +474,8 @@ function showPoolDetailsForm(player, pool, backFn) {
     f = f.label(`${meta.color}§l${meta.label} (${list.length})  §7${percent}`);
     f = f.spacer();
     for (const reward of list) {
-      f = f.label(`${meta.color}${reward.label}`);
+      const amount = reward.count > 1 ? ` x${reward.count}` : "";
+      f = f.label(`${meta.color}${reward.label}${amount}`);
       f = f.spacer();
     }
     f = f.spacer();
