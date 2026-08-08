@@ -54,6 +54,43 @@ const BLOCK_MIN_LEVEL = {
   "minecraft:ancient_debris": 3,
 };
 
+// --- 长按连续挖掘支持 ---
+// 基岩版长按挖掘时，每破坏一格后自动开始下一格，但不会重新触发
+// playerStartBreakingBlock 事件；这里用“挖掘会话 + 视线预检”覆盖该场景。
+const miningSessions = new Map(); // playerId -> 最近一次挖掘事件 tick
+const MINING_SESSION_TIMEOUT = 100; // 5 秒无挖掘事件视为停止
+const TOOL_LOOKAHEAD_DISTANCE = 5;
+
+function markMining(player) {
+  miningSessions.set(player.id, system.currentTick);
+}
+
+function clearMining(playerId) {
+  miningSessions.delete(playerId);
+}
+
+function isMining(playerId) {
+  const last = miningSessions.get(playerId);
+  if (last === undefined) return false;
+  if (system.currentTick - last > MINING_SESSION_TIMEOUT) {
+    miningSessions.delete(playerId);
+    return false;
+  }
+  return true;
+}
+
+/** 预检玩家视线前方的方块，需要时切换合适工具（覆盖长按挖掘的下一格） */
+function ensureToolForFacingBlock(player) {
+  try {
+    const hit = player.getBlockFromViewDirection({
+      maxDistance: TOOL_LOOKAHEAD_DISTANCE,
+    });
+    const blockId = hit?.block?.typeId;
+    if (!blockId || BLOCK_MIN_LEVEL[blockId] === undefined) return;
+    autoSelectPickaxe(player, blockId);
+  } catch (e) {}
+}
+
 export function getAssistSettings(playerId) {
   const raw = world.getDynamicProperty(ASSIST_KEY + playerId);
   if (raw) {
@@ -163,10 +200,34 @@ export function init() {
   // 开始挖掘石头/圆石/矿石时自动切换合适工具（挖掘进度按新工具实时计算）
   world.afterEvents.playerStartBreakingBlock.subscribe((event) => {
     const blockId = event.blockPermutation?.type?.id;
-    if (!blockId || BLOCK_MIN_LEVEL[blockId] === undefined) return;
     const player = event.player;
     if (!getAssistSettings(player.id).stoneAutoTool) return;
-    autoSelectPickaxe(player, blockId);
+    markMining(player);
+    if (blockId && BLOCK_MIN_LEVEL[blockId] !== undefined) {
+      autoSelectPickaxe(player, blockId);
+    }
   });
 
+  // 长按挖掘：每格破坏后自动开始下一格但不会重新触发 start 事件，
+  // 在这里延续会话并预检视线前方的下一格
+  world.afterEvents.playerBreakBlock.subscribe((event) => {
+    const player = event.player;
+    if (!getAssistSettings(player.id).stoneAutoTool) return;
+    markMining(player);
+    ensureToolForFacingBlock(player);
+  });
+
+  // 松开/取消挖掘时结束会话
+  world.afterEvents.playerCancelBreakingBlock.subscribe((event) => {
+    clearMining(event.player.id);
+  });
+
+  // 会话期间每 2 tick 预检一次，兜底长按场景下事件顺序造成的空档
+  system.runInterval(() => {
+    for (const player of world.getPlayers()) {
+      if (!isMining(player.id)) continue;
+      if (!getAssistSettings(player.id).stoneAutoTool) continue;
+      ensureToolForFacingBlock(player);
+    }
+  });
 }
