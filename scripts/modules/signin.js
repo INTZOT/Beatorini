@@ -64,73 +64,93 @@ export function clearSignin(playerId) {
 }
 
 export function showSigninForm(player) {
-  const today = getTodayStr();
-  const info = getSigninInfo(player.id);
-  const alreadySigned = info.lastDate === today;
+  let signed = false;
+  let closed = false;
 
-  let { streak } = info;
-  if (!alreadySigned && info.lastDate !== getYesterdayStr()) {
-    streak = 0;
-  }
+  function attempt() {
+    if (closed || signed) return;
+    try {
+      if (!player.isValid()) return;
+    } catch (e) {
+      return;
+    }
 
-  const reward = Math.min(
-    SIGNIN_BASE_REWARD + streak * SIGNIN_STREAK_REWARD,
-    SIGNIN_MAX_REWARD
-  );
+    const today = getTodayStr();
+    const info = getSigninInfo(player.id);
+    const alreadySigned = info.lastDate === today;
 
-  const form = new CustomForm(player, "灯浮市Beatorini");
-  const statusText = new ObservableString(
-    alreadySigned
-      ? `§a你已连续签到 ${streak} 天！`
-      : `§e今日签到奖励: ${reward} 金币`,
-    { clientWritable: true }
-  );
-  form.label(statusText).spacer();
+    let { streak } = info;
+    if (!alreadySigned && info.lastDate !== getYesterdayStr()) {
+      streak = 0;
+    }
 
-  // --- 服务器公告 ---
-  form.label("§6§l【服务器公告】");
-  form.spacer();
-  for (const line of SERVER_ANNOUNCEMENTS) {
-    form.label(line);
+    const reward = Math.min(
+      SIGNIN_BASE_REWARD + streak * SIGNIN_STREAK_REWARD,
+      SIGNIN_MAX_REWARD
+    );
+
+    const form = new CustomForm(player, "灯浮市Beatorini");
+    const statusText = new ObservableString(
+      alreadySigned
+        ? `§a你已连续签到 ${streak} 天！`
+        : `§e今日签到奖励: ${reward} 金币`,
+      { clientWritable: true }
+    );
+    form.label(statusText).spacer();
+
+    // --- 服务器公告 ---
+    form.label("§6§l【服务器公告】");
     form.spacer();
-  }
-
-  // --- 服务器更新日志 ---
-  form.label("§6§l【服务器更新日志】");
-  form.spacer();
-  for (const entry of SERVER_CHANGELOGS) {
-    form.label(`§e${entry.version}`);
-    form.spacer();
-    for (const line of entry.items) {
+    for (const line of SERVER_ANNOUNCEMENTS) {
       form.label(line);
       form.spacer();
     }
+
+    // --- 服务器更新日志 ---
+    form.label("§6§l【服务器更新日志】");
+    form.spacer();
+    for (const entry of SERVER_CHANGELOGS) {
+      form.label(`§e${entry.version}`);
+      form.spacer();
+      for (const line of entry.items) {
+        form.label(line);
+        form.spacer();
+      }
+    }
+
+    form.button(alreadySigned ? "关闭" : "签到", () => {
+      if (signed) return;
+      signed = true;
+      if (alreadySigned) {
+        form.close();
+        return;
+      }
+      const newStreak = streak + 1;
+      saveSigninInfo(player.id, today, newStreak);
+      player.runCommand(`scoreboard players add @s money ${reward}`);
+      player.sendMessage(
+        `§a签到成功！获得 ${reward} 金币，连续签到 ${newStreak} 天`
+      );
+      player.playSound("random.orb");
+      statusText.setData(`§a你已连续签到 ${newStreak} 天！`);
+      player.dimension.spawnEntity("minecraft:fireworks_rocket", player.location);
+      form.close();
+    });
+
+    // 表单成功展示后，等玩家关闭（按钮/关闭按钮/取消）即停止；
+    // 展示失败则持续重试，直到玩家看到并关闭为止
+    form
+      .show()
+      .then(() => {
+        closed = true;
+      })
+      .catch((e) => {
+        console.warn("Signin form failed:", e);
+        if (!signed && !closed) {
+          system.runTimeout(attempt, 20);
+        }
+      });
   }
 
-  let signed = false;
-  form.button(alreadySigned ? "关闭" : "签到", () => {
-    if (signed) return;
-    signed = true;
-    if (alreadySigned) {
-      form.close();
-      return;
-    }
-    const newStreak = streak + 1;
-    saveSigninInfo(player.id, today, newStreak);
-    player.runCommand(`scoreboard players add @s money ${reward}`);
-    player.sendMessage(
-      `§a签到成功！获得 ${reward} 金币，连续签到 ${newStreak} 天`
-    );
-    player.playSound("random.orb");
-    statusText.setData(`§a你已连续签到 ${newStreak} 天！`);
-    player.dimension.spawnEntity("minecraft:fireworks_rocket", player.location);
-    form.close();
-  });
-
-  form.show().catch((e) => {
-    console.warn("Signin form failed:", e);
-    if (!signed) {
-      system.runTimeout(() => showSigninForm(player), 20);
-    }
-  });
+  attempt();
 }
