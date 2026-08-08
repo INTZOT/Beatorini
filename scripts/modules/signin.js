@@ -195,25 +195,40 @@ export function showSigninForm(player) {
         .show()
         .then((response) => {
           showing = false;
+          const canceled = response?.canceled;
+          const reason = response?.cancelationReason;
           if (DEBUG_SIGNIN) {
             console.warn(
-              `[SigninDebug] attempt #${attemptCount} show resolved canceled=${response?.canceled} reason=${response?.cancelationReason}`
+              `[SigninDebug] attempt #${attemptCount} show resolved canceled=${canceled} reason=${reason}`
             );
           }
-          if (
-            response?.canceled &&
-            response.cancelationReason === "UserBusy"
-          ) {
-            if (!signed && !closed) {
-              system.runTimeout(attempt, 1);
-            }
-          } else {
+
+          if (reason === "UserClosed") {
             if (DEBUG_SIGNIN) {
               console.warn(
                 `[SigninDebug] attempt #${attemptCount} player closed, stop`
               );
             }
             closed = true;
+          } else if (reason === "UserBusy") {
+            // 玩家正忙/聊天框打开/其他界面占用：表单未真正展示，继续下一 tick
+            if (!signed && !closed) {
+              system.runTimeout(attempt, 1);
+            }
+          } else if (canceled === false) {
+            // 表单被明确提交（按钮回调已处理并关闭）
+            closed = true;
+          } else {
+            // canceled 为 undefined/true 但无明确原因：
+            // 疑似进服瞬间客户端未就绪、表单未真正展示，视为未展示继续重试
+            if (DEBUG_SIGNIN) {
+              console.warn(
+                `[SigninDebug] attempt #${attemptCount} ambiguous resolve, retry`
+              );
+            }
+            if (!signed && !closed) {
+              system.runTimeout(attempt, 1);
+            }
           }
         })
         .catch((e) => {
