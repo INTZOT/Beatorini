@@ -257,19 +257,19 @@ function deductMoney(player, amount) {
 // 硬保底
 // ============================================================
 
-function getPity(player, prefix) {
-  const value = world.getDynamicProperty(prefix + player.id);
+function getPity(player, poolId, prefix) {
+  const value = world.getDynamicProperty(prefix + poolId + "_" + player.id);
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function setPity(player, prefix, value) {
-  world.setDynamicProperty(prefix + player.id, value);
+function setPity(player, poolId, prefix, value) {
+  world.setDynamicProperty(prefix + poolId + "_" + player.id, value);
 }
 
-function getPityInfo(player) {
+function getPityInfo(player, poolId) {
   return {
-    epic: getPity(player, LOTTERY_PITY_EPIC_PREFIX),
-    legendary: getPity(player, LOTTERY_PITY_LEGENDARY_PREFIX),
+    epic: getPity(player, poolId, LOTTERY_PITY_EPIC_PREFIX),
+    legendary: getPity(player, poolId, LOTTERY_PITY_LEGENDARY_PREFIX),
   };
 }
 
@@ -278,8 +278,8 @@ function getPityInfo(player) {
  * 返回 { reward, pityType }，pityType 为 "epic"/"legendary"/null。
  */
 function drawOneWithPity(player, pool) {
-  let epicPity = getPity(player, LOTTERY_PITY_EPIC_PREFIX);
-  let legendaryPity = getPity(player, LOTTERY_PITY_LEGENDARY_PREFIX);
+  let epicPity = getPity(player, pool.id, LOTTERY_PITY_EPIC_PREFIX);
+  let legendaryPity = getPity(player, pool.id, LOTTERY_PITY_LEGENDARY_PREFIX);
   let reward;
   let pityType = null;
 
@@ -305,8 +305,8 @@ function drawOneWithPity(player, pool) {
     legendaryPity += 1;
   }
 
-  setPity(player, LOTTERY_PITY_EPIC_PREFIX, epicPity);
-  setPity(player, LOTTERY_PITY_LEGENDARY_PREFIX, legendaryPity);
+  setPity(player, pool.id, LOTTERY_PITY_EPIC_PREFIX, epicPity);
+  setPity(player, pool.id, LOTTERY_PITY_LEGENDARY_PREFIX, legendaryPity);
   return { reward, pityType };
 }
 
@@ -416,7 +416,7 @@ function showDrawResultForm(player, pool, results, dropped, isTen, backFn) {
 
 function showPoolMenu(player, pool, backFn) {
   const tenCost = pool.singleCost * TEN_PULL_COUNT;
-  const pity = getPityInfo(player);
+  const pity = getPityInfo(player, pool.id);
   let f = new CustomForm(player, `${pool.icon} ${pool.name}`);
   f = f.label(`§6当前金币: ${formatNumber(getPlayerMoney(player))}`);
   f = f.spacer();
