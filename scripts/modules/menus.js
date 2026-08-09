@@ -29,7 +29,6 @@ import { showSigninForm } from "./signin.js";
 import { showAssistantMenu, getAssistSettings } from "./assistants.js";
 import { debugVault } from "./vault.js";
 import { showLotteryMenu } from "./lottery.js";
-import { showImageTestForm } from "./imgtest.js";
 import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
 
 // ============================================================
@@ -426,17 +425,6 @@ export function init() {
         return;
       }
       debugVault(player);
-      return;
-    }
-    if (event.message === "#imgtest") {
-      event.cancel = true;
-      if (!player.hasTag("op")) {
-        player.sendMessage("§c你没有权限使用此命令！");
-        return;
-      }
-      // chatSend 回调运行在受限执行权限下，Observable 构造器不可用；
-      // 且聊天栏关闭需要时间，延迟 10 tick（0.5 秒）避免 UserBusy 阻挡表单
-      system.runTimeout(() => showImageTestForm(player), 10);
       return;
     }
     // 普通聊天消息添加称号前缀
