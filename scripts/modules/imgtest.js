@@ -9,10 +9,8 @@ import {
   ObservableString,
 } from "@minecraft/server-ui";
 
-// 与 BeatoriniRP/manifest.json 保持一致
+// 已确认：pack 参数需传资源包 manifest 的 header.uuid
 const PACK_UUID = "514c208a-df2f-4868-9c82-cfd4f9bf7d85";
-const PACK_NAME = "Beatorini 资源包";
-const PACK_FOLDER = "BeatoriniRP";
 
 const SRC_A = "textures/ui/test/img_a.png";
 const SRC_B = "textures/ui/test/img_b.png";
@@ -23,16 +21,9 @@ export function showImageTestForm(player) {
   const dynamicWidth = new ObservableNumber(0.5);
 
   const form = new CustomForm(player, "DDUI image 测试")
-    .label("§e§l候选 pack 值（同一张图，哪张能显示就是有效值）")
+    .label("§7pack 参数已确认：资源包 header UUID")
     .spacer()
-    .label("§71) UUID")
     .image(SRC_A, PACK_UUID, { width: 0.8 })
-    .spacer()
-    .label("§72) 包名: Beatorini 资源包")
-    .image(SRC_A, PACK_NAME, { width: 0.8 })
-    .spacer()
-    .label("§73) 文件夹名: BeatoriniRP")
-    .image(SRC_A, PACK_FOLDER, { width: 0.8 })
     .spacer()
     .divider()
     .label("§e§l动态测试（src/width/visible/tooltip/onClick）")
