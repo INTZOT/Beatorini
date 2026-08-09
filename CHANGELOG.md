@@ -8,6 +8,10 @@
 
 - **市场超时自动下架**（`market.js`）：上架超过 48 小时未被购买的商品自动下架；卖家在线时直接无损返还背包（背包满则掉落脚下），离线时进入离线返还队列，登录后从金库无损取回；启动约 1 分钟后及每 10 分钟各检查一次。
 
+### 修复
+
+- **DDUI 关闭原因兼容**（`signin.js`）：`@minecraft/server-ui 2.2.0-beta` 起 `CustomForm.show()` 改为返回 `DataDrivenScreenClosedReason` 字符串（`ClientClosed`/`ServerClosed`/`UserBusy`）而非旧的响应对象；登录公告重试逻辑已同步适配，兼容新旧两种返回。
+
 ## [4.7.3] - 2026-08-09
 
 ### 修复

@@ -24,6 +24,8 @@ const SERVER_CHANGELOGS = [
       "§a▸ 市场优化",
       "  §7上架超48小时未售出自动下架",
       "  §7在线直接返还，离线登录后自动取回",
+      "§e▸ 修复",
+      "  §7适配新版DDUI关闭返回格式，公告关闭/提交后不再反复重弹",
     ],
   },
 ];
@@ -146,21 +148,31 @@ export function showSigninForm(player) {
       // - UserClosed（玩家主动关闭）或点击按钮：停止检查
       form
         .show()
-        .then((response) => {
+        .then((closeResult) => {
           showing = false;
-          const canceled = response?.canceled;
-          const reason = response?.cancelationReason;
+          // 新版 CustomForm.show() 返回 DataDrivenScreenClosedReason 字符串
+          // （ClientClosed/ServerClosed/UserBusy）；旧版返回响应对象，兼容处理
+          const reason =
+            typeof closeResult === "string"
+              ? closeResult
+              : closeResult?.cancelationReason;
+          const canceled =
+            closeResult && typeof closeResult === "object"
+              ? closeResult.canceled
+              : undefined;
 
-          if (reason === "UserClosed") {
+          if (
+            reason === "ClientClosed" ||
+            reason === "ServerClosed" ||
+            reason === "UserClosed" ||
+            canceled === false
+          ) {
             closed = true;
           } else if (reason === "UserBusy") {
             // 玩家正忙/聊天框打开/其他界面占用：表单未真正展示，继续下一 tick
             if (!signed && !closed) {
               system.runTimeout(attempt, 1);
             }
-          } else if (canceled === false) {
-            // 表单被明确提交（按钮回调已处理并关闭）
-            closed = true;
           } else {
             // canceled 为 undefined/true 但无明确原因：
             // 疑似进服瞬间客户端未就绪、表单未真正展示，视为未展示继续重试
