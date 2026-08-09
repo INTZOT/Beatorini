@@ -6,6 +6,36 @@ import {
 } from "./config.js";
 import { getPlayerBoundIndex } from "./island.js";
 
+/** 临时调试：为指定玩家跑一遍流浪商人生成流程（需在自己的空岛） */
+export function debugSpawnTrader(player) {
+  const boundIndex = getPlayerBoundIndex(player.id);
+  const dimId =
+    boundIndex === undefined
+      ? null
+      : `${DIMENSION_NAMESPACE}:void_${boundIndex}`;
+  if (boundIndex === undefined || player.dimension.id !== dimId) {
+    player.sendMessage("§c请先回到自己的空岛再测试！");
+    return;
+  }
+
+  const safePos = findSafeSpawnNear(player);
+  if (!safePos) {
+    player.sendMessage("§c未找到安全生成点，未生成流浪商人");
+    return;
+  }
+
+  const trader = player.dimension.spawnEntity(
+    "minecraft:wandering_trader",
+    safePos
+  );
+  player.sendMessage("§e[调试] 流浪商人已在安全点生成！");
+  system.runTimeout(() => {
+    try {
+      trader.remove();
+    } catch (e) {}
+  }, 20 * 60 * 10);
+}
+
 /** 在玩家附近寻找安全生成点：不生成在虚空，需要脚下实心方块 + 2 格垂直空间 */
 function findSafeSpawnNear(player) {
   const dim = player.dimension;

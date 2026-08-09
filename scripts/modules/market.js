@@ -6,8 +6,9 @@ import { storeItem, takeItem, getVaultEntities, getVaultCount } from "./vault.js
 import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_VAULT_INDEX_KEY, MARKET_QUARANTINE_KEY } from "./config.js";
 
 // --- 市场超时自动下架 ---
-const AUTO_DELIST_MS = 48 * 60 * 60 * 1000; // 上架超过48小时未售出
-const MARKET_AUTO_DELIST_INTERVAL_TICKS = 20 * 60 * 10; // 每10分钟检查一次
+// TODO 临时调试：正式值应恢复为 48 小时（48*60*60*1000）与每10分钟检查（20*60*10）
+const AUTO_DELIST_MS = 60 * 1000; // 临时：1分钟未售出即下架
+const MARKET_AUTO_DELIST_INTERVAL_TICKS = 20 * 10; // 临时：每10秒检查一次
 
 // ============================================================
 // 市场数据操作
