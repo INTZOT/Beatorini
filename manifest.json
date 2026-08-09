@@ -29,6 +29,10 @@
     {
       "module_name": "@minecraft/server-ui",
       "version": "2.2.0-beta"
+    },
+    {
+      "uuid": "514c208a-df2f-4868-9c82-cfd4f9bf7d85",
+      "version": [1, 0, 0]
     }
   ],
   "capabilities": ["script_eval"]

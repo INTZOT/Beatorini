@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Beatorini 资源包",
+    "description": "DDUI image 测试资源包",
+    "uuid": "514c208a-df2f-4868-9c82-cfd4f9bf7d85",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 26, 30]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "54156f4e-00b7-4f0a-9c93-f9f6e419f084",
+      "version": [1, 0, 0]
+    }
+  ]
+}
