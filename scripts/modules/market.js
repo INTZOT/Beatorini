@@ -5,6 +5,10 @@ import { getPlayerMoney } from "./money.js";
 import { storeItem, takeItem, getVaultEntities, getVaultCount } from "./vault.js";
 import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_VAULT_INDEX_KEY, MARKET_QUARANTINE_KEY } from "./config.js";
 
+// --- 市场超时自动下架 ---
+const AUTO_DELIST_MS = 48 * 60 * 60 * 1000; // 上架超过48小时未售出
+const MARKET_AUTO_DELIST_INTERVAL_TICKS = 20 * 60 * 10; // 每10分钟检查一次
+
 // ============================================================
 // 市场数据操作
 // ============================================================
@@ -42,6 +46,9 @@ function clearMarketSold(playerId) {
 function getMarketReturns(playerId) {
   const raw = world.getDynamicProperty(MARKET_RETURNS_PREFIX + playerId);
   return raw ? JSON.parse(raw) : [];
+}
+function setMarketReturns(playerId, list) {
+  world.setDynamicProperty(MARKET_RETURNS_PREFIX + playerId, JSON.stringify(list));
 }
 function clearMarketReturns(playerId) {
   world.setDynamicProperty(MARKET_RETURNS_PREFIX + playerId, undefined);
@@ -549,11 +556,37 @@ function onPlayerJoin(player) {
   if (returns.length === 0) return;
 
   system.runTimeout(() => {
+    const remaining = [];
+    let delivered = 0;
     for (const r of returns) {
+      if (r.vault) {
+        // 金库无损返还：直接从金库取出完整 ItemStack 交给玩家
+        const stack = takeItem(r.vault.index, r.vault.slot);
+        if (stack) {
+          const leftover = player
+            .getComponent("inventory")
+            .container.addItem(stack);
+          if (leftover) {
+            player.dimension.spawnItem(leftover, player.location);
+          }
+          delivered++;
+          continue;
+        }
+        remaining.push(r);
+        continue;
+      }
+      // 旧格式返还（无金库引用）
       giveItemToPlayer(player, r.typeId, r.amount, r.itemProps);
+      delivered++;
     }
-    clearMarketReturns(player.id);
-    player.sendMessage(`§e市场：你的 ${returns.length} 件下架商品已返还`);
+    if (remaining.length > 0) {
+      setMarketReturns(player.id, remaining);
+    } else {
+      clearMarketReturns(player.id);
+    }
+    if (delivered > 0) {
+      player.sendMessage(`§e市场：你的 ${delivered} 件下架商品已返还`);
+    }
   }, 20);
 }
 
@@ -564,6 +597,86 @@ export function init() {
   system.beforeEvents.startup.subscribe(() => {
     system.runTimeout(() => scheduleMarketReconcile(0), 20);
   });
+
+  // 每10分钟检查一次超48小时未售出的商品，自动下架并返还
+  system.runInterval(() => {
+    if (!isVaultReadyForMarket()) return;
+    autoDelistExpiredListings();
+  }, MARKET_AUTO_DELIST_INTERVAL_TICKS);
+
+  // 启动约1分钟后补一次检查
+  system.runTimeout(() => {
+    if (!isVaultReadyForMarket()) return;
+    autoDelistExpiredListings();
+  }, 20 * 60);
+}
+
+/** 金库已加载完成才执行依赖金库的操作 */
+function isVaultReadyForMarket() {
+  const expected = getVaultCount();
+  const found = getVaultEntities().length;
+  if (expected > 0 && found < expected) return false;
+  const listings = getMarketListings();
+  if (listings.length > 0 && expected === 0 && found === 0) return false;
+  return true;
+}
+
+/** 自动下架超过48小时未售出的商品 */
+function autoDelistExpiredListings() {
+  try {
+    const now = Date.now();
+    const listings = getMarketListings();
+    const expired = listings.filter(
+      (l) =>
+        typeof l.listedAt === "number" && now - l.listedAt >= AUTO_DELIST_MS
+    );
+    if (expired.length === 0) return;
+
+    const expiredIds = new Set(expired.map((l) => l.id));
+    setMarketListings(listings.filter((l) => !expiredIds.has(l.id)));
+
+    for (const l of expired) {
+      const stack = takeItem(l.vault?.index, l.vault?.slot);
+      const seller = [...world.getPlayers()].find(
+        (p) => p.id === l.sellerId
+      );
+
+      if (seller && stack) {
+        const leftover = seller
+          .getComponent("inventory")
+          .container.addItem(stack);
+        if (leftover) {
+          seller.dimension.spawnItem(leftover, seller.location);
+        }
+        seller.sendMessage({
+          rawtext: [
+            { text: "§e市场：你的 §f" },
+            getListingDisplayName(l),
+            {
+              text: ` x${l.amount} §e已上架超过48小时未售出，已自动下架并返还`,
+            },
+          ],
+        });
+        seller.playSound("random.orb");
+        continue;
+      }
+
+      // 离线或取回失败：进入离线返还队列（保留金库引用，登录后无损取回）
+      const returns = getMarketReturns(l.sellerId);
+      returns.push({
+        typeId: l.typeId,
+        amount: l.amount,
+        itemKey: l.itemKey,
+        vault: l.vault,
+        returnedAt: now,
+      });
+      setMarketReturns(l.sellerId, returns);
+    }
+
+    console.warn(`[Market] 自动下架 ${expired.length} 件超48小时未售出商品`);
+  } catch (e) {
+    console.error(`[Market] Auto delist failed: ${e}`);
+  }
 }
 
 /**
