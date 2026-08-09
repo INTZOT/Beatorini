@@ -434,8 +434,9 @@ export function init() {
         player.sendMessage("§c你没有权限使用此命令！");
         return;
       }
-      // chatSend 回调运行在受限执行权限下，Observable 构造器不可用，延迟到下一 tick
-      system.runTimeout(() => showImageTestForm(player), 1);
+      // chatSend 回调运行在受限执行权限下，Observable 构造器不可用；
+      // 且聊天栏关闭需要时间，延迟 10 tick（0.5 秒）避免 UserBusy 阻挡表单
+      system.runTimeout(() => showImageTestForm(player), 10);
       return;
     }
     // 普通聊天消息添加称号前缀
