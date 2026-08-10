@@ -68,15 +68,29 @@ function buildTitleShape(player) {
     shape.attachedTo = player;
     world.primitiveShapesManager.addText(shape, player.dimension);
     titleShapes.set(player.id, shape);
-    refreshAllVisibleTo();
   } catch (e) {
     console.warn(`[Title] 头顶称号创建失败: ${e}`);
   }
 }
 
-/** 刷新所有头顶称号的可见列表：本人不可见，其余在线玩家可见 */
-function refreshAllVisibleTo() {
+/** 同步全服头顶称号：单人时不显示；多人时确保每人有称号且本人不可见 */
+function refreshAllTitleShapes() {
   const players = [...world.getPlayers()];
+  if (players.length <= 1) {
+    // 单人时无法表达"对所有人不可见"（空列表=全服可见），直接全部移除
+    for (const [id, shape] of [...titleShapes]) {
+      try {
+        world.primitiveShapesManager.removeText(shape);
+      } catch (e) {}
+      titleShapes.delete(id);
+    }
+    return;
+  }
+  // 确保所有在线玩家都有头顶称号（如刚超过单人阈值）
+  for (const p of players) {
+    if (!titleShapes.has(p.id)) buildTitleShape(p);
+  }
+  // 本人不可见，其余在线玩家可见
   for (const [ownerId, shape] of titleShapes) {
     try {
       shape.visibleTo = players.filter((p) => p.id !== ownerId);
@@ -95,6 +109,10 @@ function removeTitleShape(playerId) {
 
 /** 重建某玩家的头顶称号（无称号时清除） */
 export function syncTitleShape(player) {
+  if ([...world.getPlayers()].length <= 1) {
+    removeTitleShape(player.id);
+    return;
+  }
   removeTitleShape(player.id);
   buildTitleShape(player);
 }
@@ -181,13 +199,13 @@ export function init() {
     } else {
       syncTitleShape(player);
     }
-    refreshAllVisibleTo();
+    refreshAllTitleShapes();
   });
 
   // 下线清理 / 换维重建 / reload 后为在线玩家重建
   world.afterEvents.playerLeave.subscribe((event) => {
     removeTitleShape(event.playerId);
-    refreshAllVisibleTo();
+    refreshAllTitleShapes();
   });
   world.afterEvents.playerDimensionChange.subscribe((event) => {
     if (titleShapes.has(event.player.id)) {
@@ -206,7 +224,7 @@ export function init() {
   world.afterEvents.worldLoad.subscribe(() => {
     system.runTimeout(() => {
       for (const p of world.getPlayers()) syncTitleShape(p);
-      refreshAllVisibleTo();
+      refreshAllTitleShapes();
     }, 10);
   });
 }
