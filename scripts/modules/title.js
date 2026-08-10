@@ -545,7 +545,7 @@ export function showTitleMenu(player, backFn) {
 
   const NO_TITLE_INDEX = ownedTitles.length; // 下拉末项：无称号
   const items = ownedTitles.map((t, i) => ({
-    label: `${t.color}【${t.name}】`,
+    label: `【${t.name}】`,
     value: i,
   }));
   items.push({ label: "无称号（默认）", value: NO_TITLE_INDEX });
