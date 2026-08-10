@@ -19,10 +19,11 @@ const SERVER_ANNOUNCEMENTS = [
 // --- 进入表单的服务器更新日志（最新在上） ---
 const SERVER_CHANGELOGS = [
   {
-    version: "Release 4.9.4",
+    version: "Release 4.9.5",
     items: [
-      "§e▸ 修复",
-      "  §7排行榜离线玩家显示真实名字（自动绑定 ID→名字）",
+      "§a▸ 新增",
+      "  §7末地奖池：黑曜石/末影珍珠/紫颂果/末地石/末影箱/潜影壳/紫颂花/龙首/鞘翅/龙蛋",
+      "  §7单抽10万，保底与现有奖池一致",
     ],
   },
 ];

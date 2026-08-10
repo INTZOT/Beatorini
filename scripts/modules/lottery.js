@@ -143,6 +143,21 @@ const NETHER_REWARDS = [
   ["minecraft:nether_wart", "下界疣", "legendary", 1],
 ];
 
+// --- 末地奖池内容 ---
+// [物品 ID, 中文名, 稀有度, 单次数量]
+const END_REWARDS = [
+  ["minecraft:obsidian", "黑曜石", "common", 8],
+  ["minecraft:ender_pearl", "末影珍珠", "common", 8],
+  ["minecraft:chorus_fruit", "紫颂果", "common", 16],
+  ["minecraft:end_stone", "末地石", "common", 16],
+  ["minecraft:ender_chest", "末影箱", "rare", 2],
+  ["minecraft:shulker_shell", "潜影壳", "rare", 2],
+  ["minecraft:chorus_flower", "紫颂花", "epic", 1],
+  ["minecraft:dragon_head", "龙首", "epic", 1],
+  ["minecraft:elytra", "鞘翅", "legendary", 1],
+  ["minecraft:dragon_egg", "龙蛋", "legendary", 1],
+];
+
 // --- 奖池列表（后续新增奖池直接在此追加） ---
 const LOTTERY_POOLS = [
   {
@@ -165,6 +180,19 @@ const LOTTERY_POOLS = [
     description: `内含 ${NETHER_REWARDS.length} 种下界物资，从常见方块到稀有材料！`,
     singleCost: 100000,
     rewards: NETHER_REWARDS.map(([typeId, label, rarity, count = 1]) => ({
+      typeId,
+      label,
+      rarity,
+      count,
+    })),
+  },
+  {
+    id: "end",
+    name: "末地奖池",
+    icon: "◆",
+    description: `内含 ${END_REWARDS.length} 种末地物资，从黑曜石到鞘翅龙蛋！`,
+    singleCost: 100000,
+    rewards: END_REWARDS.map(([typeId, label, rarity, count = 1]) => ({
       typeId,
       label,
       rarity,
