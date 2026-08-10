@@ -66,11 +66,21 @@ function buildTitleShape(player) {
     shape.backgroundColorOverride = { red: 0, green: 0, blue: 0, alpha: 0.45 };
     shape.depthTest = false;
     shape.attachedTo = player;
-    shape.visibleTo = []; // 全服可见
     world.primitiveShapesManager.addText(shape, player.dimension);
     titleShapes.set(player.id, shape);
+    refreshAllVisibleTo();
   } catch (e) {
     console.warn(`[Title] 头顶称号创建失败: ${e}`);
+  }
+}
+
+/** 刷新所有头顶称号的可见列表：本人不可见，其余在线玩家可见 */
+function refreshAllVisibleTo() {
+  const players = [...world.getPlayers()];
+  for (const [ownerId, shape] of titleShapes) {
+    try {
+      shape.visibleTo = players.filter((p) => p.id !== ownerId);
+    } catch (e) {}
   }
 }
 
@@ -171,11 +181,13 @@ export function init() {
     } else {
       syncTitleShape(player);
     }
+    refreshAllVisibleTo();
   });
 
   // 下线清理 / 换维重建 / reload 后为在线玩家重建
   world.afterEvents.playerLeave.subscribe((event) => {
     removeTitleShape(event.playerId);
+    refreshAllVisibleTo();
   });
   world.afterEvents.playerDimensionChange.subscribe((event) => {
     if (titleShapes.has(event.player.id)) {
@@ -194,6 +206,7 @@ export function init() {
   world.afterEvents.worldLoad.subscribe(() => {
     system.runTimeout(() => {
       for (const p of world.getPlayers()) syncTitleShape(p);
+      refreshAllVisibleTo();
     }, 10);
   });
 }
