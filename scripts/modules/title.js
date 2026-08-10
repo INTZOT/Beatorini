@@ -12,7 +12,6 @@ import {
   PLAYER_SIGNIN_STREAK,
   MARKET_SOLD_PREFIX,
 } from "./config.js";
-import { getPlayerBoundIndex } from "./island.js";
 import { getStat } from "./stats.js";
 import { getAchievements } from "./achievements.js";
 import { getTalentLevel } from "./talent.js";
@@ -43,13 +42,6 @@ export const TITLES = [
     color: "§7",
     desc: "人人皆从萌新开始（初始称号）",
     owned: () => true,
-  },
-  {
-    id: "pioneer",
-    name: "空岛开拓者",
-    color: "§a",
-    desc: "创建属于自己的空岛",
-    owned: (p) => getPlayerBoundIndex(p.id) !== undefined,
   },
   {
     id: "veteran",
@@ -169,14 +161,6 @@ export const TITLES = [
       );
       return Math.min(1, maxLv / MILESTONE.TALENT_LEVEL);
     },
-  },
-  {
-    id: "nether",
-    name: "下界来客",
-    color: "§4",
-    desc: "解锁成就「下界来客」（获得石英）",
-    owned: (p) => getAchievements(p.id).includes("minecraft:quartz"),
-    progress: (p) => (getAchievements(p.id).includes("minecraft:quartz") ? 1 : 0),
   },
 ];
 
