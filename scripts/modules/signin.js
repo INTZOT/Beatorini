@@ -19,11 +19,11 @@ const SERVER_ANNOUNCEMENTS = [
 // --- 进入表单的服务器更新日志（最新在上） ---
 const SERVER_CHANGELOGS = [
   {
-    version: "Release 4.9.2",
+    version: "Release 4.9.3",
     items: [
-      "§e▸ 修复",
-      "  §7金币系列称号改为按历史最高持有金币解锁",
-      "  §7达到门槛后花钱不再丢失称号",
+      "§a▸ 调整",
+      "  §7空桶回收黑曜石改为手持空桶右键触发",
+      "  §7玩法提示重置，新增 20 条 tips",
     ],
   },
 ];
