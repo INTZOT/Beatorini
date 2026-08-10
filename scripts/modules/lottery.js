@@ -304,7 +304,7 @@ const LOTTERY_POOLS = [
     id: "treasure",
     name: "宝藏奖池",
     icon: "❖",
-    description: `内含 ${TREASURE_REWARDS.length} 种宝藏物品，从唱片陶片到鞘翅重锤！`,
+    description: `内含 ${TREASURE_REWARDS.length} 种宝藏物品，从唱片陶片到三叉戟重锤！`,
     singleCost: 100000,
     rewards: TREASURE_REWARDS.map(([typeId, label, rarity, count = 1]) => ({
       typeId,
