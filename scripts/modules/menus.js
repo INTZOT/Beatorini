@@ -70,10 +70,6 @@ function showIslandMenu(player) {
     f.close();
     system.runTimeout(() => showTradeSubMenu(player), 2);
   });
-  f = f.button("抽奖", () => {
-    f.close();
-    system.runTimeout(() => showLotteryMenu(player, showIslandMenu), 2);
-  });
   f = f.button("设置", () => {
     f.close();
     system.runTimeout(
@@ -182,6 +178,11 @@ function showTradeSubMenu(player) {
         showMarketUnlockForm(player, showTradeSubMenu);
       }
     }, 2);
+  });
+  f = f.spacer();
+  f = f.button("抽奖", () => {
+    f.close();
+    system.runTimeout(() => showLotteryMenu(player, showTradeSubMenu), 2);
   });
   f = f.spacer();
   f = f.button("返回", () => {
