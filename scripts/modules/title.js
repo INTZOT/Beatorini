@@ -308,7 +308,6 @@ export function setWornTitle(playerId, titleId) {
 export function showTitleMenu(player, backFn) {
   const wornRaw = world.getDynamicProperty(TITLE_PREFIX + player.id) || "";
   const ownedTitles = TITLES.filter((t) => t.owned(player));
-  const lockedTitles = TITLES.filter((t) => !t.owned(player));
 
   const wornTitle = ownedTitles.find((x) => x.id === wornRaw);
   const wornText = wornTitle
@@ -319,7 +318,6 @@ export function showTitleMenu(player, backFn) {
   const items = ownedTitles.map((t, i) => ({
     label: `${t.color}【${t.name}】`,
     value: i,
-    description: t.desc,
   }));
   items.push({ label: "无称号（默认）", value: NO_TITLE_INDEX });
 
@@ -349,19 +347,6 @@ export function showTitleMenu(player, backFn) {
       system.runTimeout(() => showTitleMenu(player, backFn), 2);
     })
     .spacer();
-
-  if (lockedTitles.length > 0) {
-    form = form.label(`§8§l未解锁里程碑（${lockedTitles.length}）`);
-    form = form.spacer();
-    for (const t of lockedTitles) {
-      const prog = t.progress ? Math.floor(t.progress(player) * 100) : 0;
-      const progressText = t.progress ? `  §8(${prog}%)` : "";
-      form = form.label(
-        `§8🔒 ${t.color}【${t.name}】 §7- ${t.desc}${progressText}`
-      );
-      form = form.spacer();
-    }
-  }
 
   form = form
     .button("返回", () => {
