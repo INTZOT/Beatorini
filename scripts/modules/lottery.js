@@ -152,6 +152,7 @@ const END_REWARDS = [
   ["minecraft:end_stone", "末地石", "common", 16],
   ["minecraft:ender_chest", "末影箱", "rare", 2],
   ["minecraft:shulker_shell", "潜影壳", "rare", 2],
+  ["minecraft:dragon_breath", "龙息", "rare", 4],
   ["minecraft:chorus_flower", "紫颂花", "epic", 1],
   ["minecraft:dragon_head", "龙首", "epic", 1],
   ["minecraft:elytra", "鞘翅", "legendary", 1],
