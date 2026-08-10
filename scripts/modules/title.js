@@ -3,6 +3,7 @@ import { CustomForm, ObservableNumber } from "@minecraft/server-ui";
 import {
   TITLE_PREFIX,
   DEFAULT_TITLE,
+  TITLE_NOTIFY_PREFIX,
   STATS_PLAYTIME_PREFIX,
   STATS_KILLS_PREFIX,
   STATS_MINED_PREFIX,
@@ -587,6 +588,38 @@ export function showTitleMenu(player, backFn) {
 
 /** 初始化：无有效称号（含旧版原始文本）的玩家自动佩戴「萌新」 */
 export function init() {
+  // 二档及以上称号解锁全服通报（每 10 秒检查，首次解锁只通报一次）
+  system.runInterval(() => {
+    for (const p of world.getPlayers()) {
+      let notified = [];
+      const rawNotify = world.getDynamicProperty(TITLE_NOTIFY_PREFIX + p.id);
+      if (typeof rawNotify === "string") {
+        try {
+          notified = JSON.parse(rawNotify);
+        } catch (e) {}
+      }
+      let changed = false;
+      for (const t of TITLES) {
+        if (!t.tier || t.tier < 2) continue; // 仅二档及以上
+        if (notified.includes(t.id)) continue;
+        if (t.owned(p)) {
+          notified.push(t.id);
+          changed = true;
+          world.sendMessage(
+            `§e[称号通报] §f${p.name} §a解锁了称号 ${t.color}【${t.name}】§r§a！`
+          );
+          console.warn(`[Title] ${p.name} 解锁称号 ${t.name}`);
+        }
+      }
+      if (changed) {
+        world.setDynamicProperty(
+          TITLE_NOTIFY_PREFIX + p.id,
+          JSON.stringify(notified)
+        );
+      }
+    }
+  }, 200);
+
   world.afterEvents.playerSpawn.subscribe((event) => {
     const player = event.player;
     if (!player) return;
