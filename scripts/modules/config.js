@@ -51,6 +51,7 @@ export const STATS_KILLS_PREFIX = "stats:kills_";
 export const STATS_MINED_PREFIX = "stats:mined_";
 export const STATS_PLACED_PREFIX = "stats:placed_";
 export const STATS_DEATHS_PREFIX = "stats:deaths_";
+export const STATS_LOTTERY_PREFIX = "stats:lottery_";
 
 // --- 天赋 ---
 export const TALENT_PREFIX = "talent:lv_";

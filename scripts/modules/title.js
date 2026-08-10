@@ -1,16 +1,182 @@
 import { world, system, TextPrimitive } from "@minecraft/server";
 import { CustomForm, ObservableNumber } from "@minecraft/server-ui";
-import { TITLE_PREFIX, DEFAULT_TITLE } from "./config.js";
+import {
+  TITLE_PREFIX,
+  DEFAULT_TITLE,
+  STATS_PLAYTIME_PREFIX,
+  STATS_KILLS_PREFIX,
+  STATS_MINED_PREFIX,
+  STATS_PLACED_PREFIX,
+  STATS_DEATHS_PREFIX,
+  STATS_LOTTERY_PREFIX,
+  PLAYER_SIGNIN_STREAK,
+  MARKET_SOLD_PREFIX,
+} from "./config.js";
+import { getPlayerBoundIndex } from "./island.js";
+import { getStat } from "./stats.js";
+import { getAchievements } from "./achievements.js";
+import { getTalentLevel } from "./talent.js";
+import { getPlayerMoney } from "./money.js";
+
+// --- 里程碑阈值（可按需调整） ---
+const MILESTONE = {
+  PLAY_HOURS: 100, // 累计在线 100 小时
+  SIGNIN_DAYS: 7, // 连续签到 7 天
+  PLACE_COUNT: 10000, // 累计放置 10000 方块
+  MINE_COUNT: 10000, // 累计挖掘 10000 方块
+  KILL_COUNT: 100, // 累计击杀 100
+  DEATH_COUNT: 50, // 累计死亡 50（致敬）
+  MONEY: 1000000, // 持有金币 100 万
+  SOLD_COUNT: 100, // 市场累计售出 100 件
+  ACHIEVE_COUNT: 30, // 解锁 30 个成就
+  TALENT_LEVEL: 100, // 任意天赋 100 级
+  LOTTERY_COUNT: 50, // 累计抽奖 50 次
+};
 
 // --- 称号目录 ---
 // id: 存储标识；name: 称号名；color: 颜色代码；desc: 解锁说明
-// 后续新称号在此追加即可
+// owned(player): 是否已解锁；progress(player): 0~1 进度（可选）
 export const TITLES = [
   {
     id: "newbie",
     name: "萌新",
     color: "§7",
     desc: "人人皆从萌新开始（初始称号）",
+    owned: () => true,
+  },
+  {
+    id: "pioneer",
+    name: "空岛开拓者",
+    color: "§a",
+    desc: "创建属于自己的空岛",
+    owned: (p) => getPlayerBoundIndex(p.id) !== undefined,
+  },
+  {
+    id: "veteran",
+    name: "老玩家",
+    color: "§9",
+    desc: `累计在线达到 ${MILESTONE.PLAY_HOURS} 小时`,
+    owned: (p) => getStat(p.id, STATS_PLAYTIME_PREFIX) >= MILESTONE.PLAY_HOURS * 3600,
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_PLAYTIME_PREFIX) / (MILESTONE.PLAY_HOURS * 3600)),
+  },
+  {
+    id: "signer",
+    name: "签到达人",
+    color: "§e",
+    desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS} 天`,
+    owned: (p) =>
+      (world.getDynamicProperty(PLAYER_SIGNIN_STREAK + p.id) ?? 0) >=
+      MILESTONE.SIGNIN_DAYS,
+    progress: (p) =>
+      Math.min(
+        1,
+        (world.getDynamicProperty(PLAYER_SIGNIN_STREAK + p.id) ?? 0) /
+          MILESTONE.SIGNIN_DAYS
+      ),
+  },
+  {
+    id: "builder",
+    name: "建筑大师",
+    color: "§e",
+    desc: `累计放置方块达到 ${MILESTONE.PLACE_COUNT} 个`,
+    owned: (p) => getStat(p.id, STATS_PLACED_PREFIX) >= MILESTONE.PLACE_COUNT,
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_PLACED_PREFIX) / MILESTONE.PLACE_COUNT),
+  },
+  {
+    id: "miner",
+    name: "挖掘机",
+    color: "§7",
+    desc: `累计挖掘方块达到 ${MILESTONE.MINE_COUNT} 个`,
+    owned: (p) => getStat(p.id, STATS_MINED_PREFIX) >= MILESTONE.MINE_COUNT,
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_MINED_PREFIX) / MILESTONE.MINE_COUNT),
+  },
+  {
+    id: "hunter",
+    name: "怪物猎人",
+    color: "§c",
+    desc: `累计击杀达到 ${MILESTONE.KILL_COUNT} 次`,
+    owned: (p) => getStat(p.id, STATS_KILLS_PREFIX) >= MILESTONE.KILL_COUNT,
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_KILLS_PREFIX) / MILESTONE.KILL_COUNT),
+  },
+  {
+    id: "phoenix",
+    name: "凤凰涅槃",
+    color: "§d",
+    desc: `累计死亡达到 ${MILESTONE.DEATH_COUNT} 次（致敬）`,
+    owned: (p) => getStat(p.id, STATS_DEATHS_PREFIX) >= MILESTONE.DEATH_COUNT,
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_DEATHS_PREFIX) / MILESTONE.DEATH_COUNT),
+  },
+  {
+    id: "rich",
+    name: "富甲一方",
+    color: "§6",
+    desc: `持有金币达到 ${MILESTONE.MONEY.toLocaleString("zh-CN")} 金币`,
+    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY,
+    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY),
+  },
+  {
+    id: "tycoon",
+    name: "市场大亨",
+    color: "§b",
+    desc: `市场累计售出 ${MILESTONE.SOLD_COUNT} 件商品`,
+    owned: (p) =>
+      (world.getDynamicProperty(MARKET_SOLD_PREFIX + p.id) ?? 0) >=
+      MILESTONE.SOLD_COUNT,
+    progress: (p) =>
+      Math.min(
+        1,
+        (world.getDynamicProperty(MARKET_SOLD_PREFIX + p.id) ?? 0) /
+          MILESTONE.SOLD_COUNT
+      ),
+  },
+  {
+    id: "lucky",
+    name: "抽奖狂魔",
+    color: "§5",
+    desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT} 次`,
+    owned: (p) => getStat(p.id, STATS_LOTTERY_PREFIX) >= MILESTONE.LOTTERY_COUNT,
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_LOTTERY_PREFIX) / MILESTONE.LOTTERY_COUNT),
+  },
+  {
+    id: "achiever",
+    name: "成就猎人",
+    color: "§2",
+    desc: `解锁 ${MILESTONE.ACHIEVE_COUNT} 个成就`,
+    owned: (p) => getAchievements(p.id).length >= MILESTONE.ACHIEVE_COUNT,
+    progress: (p) =>
+      Math.min(1, getAchievements(p.id).length / MILESTONE.ACHIEVE_COUNT),
+  },
+  {
+    id: "talent_master",
+    name: "天赋大师",
+    color: "§3",
+    desc: `任意天赋达到 ${MILESTONE.TALENT_LEVEL} 级`,
+    owned: (p) =>
+      ["speed", "haste", "strength", "jump", "resistance", "health"].some(
+        (tid) => getTalentLevel(p.id, tid) >= MILESTONE.TALENT_LEVEL
+      ),
+    progress: (p) => {
+      const maxLv = Math.max(
+        ...["speed", "haste", "strength", "jump", "resistance", "health"].map(
+          (tid) => getTalentLevel(p.id, tid)
+        )
+      );
+      return Math.min(1, maxLv / MILESTONE.TALENT_LEVEL);
+    },
+  },
+  {
+    id: "nether",
+    name: "下界来客",
+    color: "§4",
+    desc: "解锁成就「下界来客」（获得石英）",
+    owned: (p) => getAchievements(p.id).includes("minecraft:quartz"),
+    progress: (p) => (getAchievements(p.id).includes("minecraft:quartz") ? 1 : 0),
   },
 ];
 
@@ -141,13 +307,16 @@ export function setWornTitle(playerId, titleId) {
 
 export function showTitleMenu(player, backFn) {
   const wornRaw = world.getDynamicProperty(TITLE_PREFIX + player.id) || "";
-  const wornTitle = TITLES.find((x) => x.id === wornRaw);
+  const ownedTitles = TITLES.filter((t) => t.owned(player));
+  const lockedTitles = TITLES.filter((t) => !t.owned(player));
+
+  const wornTitle = ownedTitles.find((x) => x.id === wornRaw);
   const wornText = wornTitle
     ? `${wornTitle.color}【${wornTitle.name}】§r`
     : `${DEFAULT_TITLE}§r`;
 
-  const NO_TITLE_INDEX = TITLES.length; // 下拉末项：无称号
-  const items = TITLES.map((t, i) => ({
+  const NO_TITLE_INDEX = ownedTitles.length; // 下拉末项：无称号
+  const items = ownedTitles.map((t, i) => ({
     label: `${t.color}【${t.name}】`,
     value: i,
     description: t.desc,
@@ -155,18 +324,19 @@ export function showTitleMenu(player, backFn) {
   items.push({ label: "无称号（默认）", value: NO_TITLE_INDEX });
 
   const wornIndex = wornTitle
-    ? TITLES.findIndex((t) => t.id === wornTitle.id)
+    ? ownedTitles.findIndex((t) => t.id === wornTitle.id)
     : NO_TITLE_INDEX;
   const selected = new ObservableNumber(wornIndex, { clientWritable: true });
 
-  const form = new CustomForm(player, "称号")
+  let form = new CustomForm(player, "称号")
     .label(`§e当前称号: ${wornText}`)
     .spacer()
     .dropdown("选择称号", selected, items)
     .spacer()
     .button("保存", () => {
       const idx = selected.getData();
-      const title = idx >= 0 && idx < TITLES.length ? TITLES[idx] : null;
+      const title =
+        idx >= 0 && idx < ownedTitles.length ? ownedTitles[idx] : null;
       if (title) {
         setWornTitle(player.id, title.id);
         player.sendMessage(`§a已佩戴称号: ${title.color}【${title.name}】§r`);
@@ -178,7 +348,22 @@ export function showTitleMenu(player, backFn) {
       form.close();
       system.runTimeout(() => showTitleMenu(player, backFn), 2);
     })
-    .spacer()
+    .spacer();
+
+  if (lockedTitles.length > 0) {
+    form = form.label(`§8§l未解锁里程碑（${lockedTitles.length}）`);
+    form = form.spacer();
+    for (const t of lockedTitles) {
+      const prog = t.progress ? Math.floor(t.progress(player) * 100) : 0;
+      const progressText = t.progress ? `  §8(${prog}%)` : "";
+      form = form.label(
+        `§8🔒 ${t.color}【${t.name}】 §7- ${t.desc}${progressText}`
+      );
+      form = form.spacer();
+    }
+  }
+
+  form = form
     .button("返回", () => {
       form.close();
       system.runTimeout(() => backFn(player), 2);
