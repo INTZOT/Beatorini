@@ -7,8 +7,6 @@
 import { system, world, ItemStack } from "@minecraft/server";
 import { CustomForm } from "@minecraft/server-ui";
 import { getPlayerMoney } from "./money.js";
-import { addStat } from "./stats.js";
-import { STATS_LOTTERY_PREFIX } from "./config.js";
 
 // --- 稀有度配置 ---
 const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
@@ -280,7 +278,6 @@ function getPityInfo(player, poolId) {
  * 返回 { reward, pityType }，pityType 为 "epic"/"legendary"/null。
  */
 function drawOneWithPity(player, pool) {
-  addStat(player.id, STATS_LOTTERY_PREFIX, 1);
   let epicPity = getPity(player, pool.id, LOTTERY_PITY_EPIC_PREFIX);
   let legendaryPity = getPity(player, pool.id, LOTTERY_PITY_LEGENDARY_PREFIX);
   let reward;
