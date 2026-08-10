@@ -308,29 +308,8 @@ export function setWornTitle(playerId, titleId) {
 // ============================================================
 
 export function showTitleMenu(player, backFn) {
-  // 系列自动升档：若佩戴低档且已解锁更高档，先升档
-  const raw0 = world.getDynamicProperty(TITLE_PREFIX + player.id) || "";
-  const worn0 = TITLES.find((x) => x.id === raw0);
-  if (worn0?.series) {
-    const best = TITLES.filter(
-      (t) => t.series === worn0.series && t.owned(player)
-    ).reduce((a, b) => (b.tier > a.tier ? b : a), worn0);
-    if (best.id !== worn0.id) setWornTitle(player.id, best.id);
-  }
-
   const wornRaw = world.getDynamicProperty(TITLE_PREFIX + player.id) || "";
-  const ownedAll = TITLES.filter((t) => t.owned(player));
-  // 同系列只保留已解锁的最高档
-  const ownedTitles = [];
-  for (const t of ownedAll) {
-    if (!t.series) {
-      ownedTitles.push(t);
-      continue;
-    }
-    const seriesOwned = ownedAll.filter((x) => x.series === t.series);
-    const best = seriesOwned.reduce((a, b) => (b.tier > a.tier ? b : a));
-    if (t.id === best.id) ownedTitles.push(t);
-  }
+  const ownedTitles = TITLES.filter((t) => t.owned(player));
 
   const wornTitle = ownedTitles.find((x) => x.id === wornRaw);
   const wornText = wornTitle
@@ -390,17 +369,7 @@ export function init() {
     if (raw === undefined || !valid) {
       setWornTitle(player.id, "newbie");
     } else {
-      const worn = TITLES.find((t) => t.id === raw);
-      if (worn?.series) {
-        // 系列自动升档
-        const best = TITLES.filter(
-          (t) => t.series === worn.series && t.owned(player)
-        ).reduce((a, b) => (b.tier > a.tier ? b : a), worn);
-        if (best.id !== worn.id) setWornTitle(player.id, best.id);
-        else syncTitleShape(player);
-      } else {
-        syncTitleShape(player);
-      }
+      syncTitleShape(player);
     }
     refreshAllTitleShapes();
   });
