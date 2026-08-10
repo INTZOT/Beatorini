@@ -31,7 +31,19 @@ const MILESTONE = {
   TALENT_LEVEL: [60, 120], // 天赋等级（第三档要求全部满级）
 };
 
-const TIER_COLORS = ["§7", "§e", "§5"]; // 一/二/三档颜色
+// 各系列三档配色（系列专属，避免与初始称号同色）
+const SERIES_TIER_COLORS = {
+  playtime: ["§9", "§b", "§3"], // 蓝 / 天蓝 / 深青
+  signin: ["§e", "§6", "§c"], // 黄 / 金 / 红
+  placed: ["§a", "§2", "§e"], // 绿 / 深绿 / 黄
+  mined: ["§8", "§7", "§6"], // 深灰 / 灰 / 金
+  kills: ["§c", "§4", "§d"], // 红 / 深红 / 亮紫
+  deaths: ["§5", "§d", "§c"], // 紫 / 亮紫 / 红
+  money: ["§6", "§e", "§5"], // 金 / 黄 / 紫
+  lottery: ["§5", "§d", "§b"], // 紫 / 亮紫 / 天蓝
+  achieve: ["§2", "§a", "§b"], // 深绿 / 绿 / 天蓝
+  talent: ["§3", "§9", "§d"], // 深青 / 蓝 / 亮紫
+};
 const TALENT_IDS = ["speed", "haste", "strength", "jump", "resistance", "health"];
 const fmt = (n) => n.toLocaleString("zh-CN");
 
@@ -51,7 +63,7 @@ export const TITLES = [
   {
     id: "newbie",
     name: "萌新",
-    color: "§7",
+    color: "§f",
     desc: "人人皆从萌新开始（初始称号）",
     owned: () => true,
   },
@@ -59,7 +71,7 @@ export const TITLES = [
   {
     id: "play1",
     name: "小资历",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.playtime[0],
     series: "playtime",
     tier: 1,
     desc: `累计在线达到 ${MILESTONE.PLAY_HOURS[0]} 小时`,
@@ -70,7 +82,7 @@ export const TITLES = [
   {
     id: "play2",
     name: "老资历",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.playtime[1],
     series: "playtime",
     tier: 2,
     desc: `累计在线达到 ${MILESTONE.PLAY_HOURS[1]} 小时`,
@@ -81,7 +93,7 @@ export const TITLES = [
   {
     id: "play3",
     name: "远古资历",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.playtime[2],
     series: "playtime",
     tier: 3,
     desc: `累计在线达到 ${MILESTONE.PLAY_HOURS[2]} 小时`,
@@ -93,7 +105,7 @@ export const TITLES = [
   {
     id: "sign1",
     name: "打卡王",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.signin[0],
     series: "signin",
     tier: 1,
     desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS[0]} 天`,
@@ -110,7 +122,7 @@ export const TITLES = [
   {
     id: "sign2",
     name: "打卡狂魔",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.signin[1],
     series: "signin",
     tier: 2,
     desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS[1]} 天`,
@@ -127,7 +139,7 @@ export const TITLES = [
   {
     id: "sign3",
     name: "全勤奖",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.signin[2],
     series: "signin",
     tier: 3,
     desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS[2]} 天`,
@@ -145,7 +157,7 @@ export const TITLES = [
   {
     id: "place1",
     name: "建筑达人",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.placed[0],
     series: "placed",
     tier: 1,
     desc: `累计放置方块达到 ${fmt(MILESTONE.PLACE_COUNT[0])} 个`,
@@ -156,7 +168,7 @@ export const TITLES = [
   {
     id: "place2",
     name: "建筑大师",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.placed[1],
     series: "placed",
     tier: 2,
     desc: `累计放置方块达到 ${fmt(MILESTONE.PLACE_COUNT[1])} 个`,
@@ -167,7 +179,7 @@ export const TITLES = [
   {
     id: "place3",
     name: "基建狂魔",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.placed[2],
     series: "placed",
     tier: 3,
     desc: `累计放置方块达到 ${fmt(MILESTONE.PLACE_COUNT[2])} 个`,
@@ -179,7 +191,7 @@ export const TITLES = [
   {
     id: "mine1",
     name: "挖掘机",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.mined[0],
     series: "mined",
     tier: 1,
     desc: `累计挖掘方块达到 ${fmt(MILESTONE.MINE_COUNT[0])} 个`,
@@ -190,7 +202,7 @@ export const TITLES = [
   {
     id: "mine2",
     name: "肝王",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.mined[1],
     series: "mined",
     tier: 2,
     desc: `累计挖掘方块达到 ${fmt(MILESTONE.MINE_COUNT[1])} 个`,
@@ -201,7 +213,7 @@ export const TITLES = [
   {
     id: "mine3",
     name: "肝帝",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.mined[2],
     series: "mined",
     tier: 3,
     desc: `累计挖掘方块达到 ${fmt(MILESTONE.MINE_COUNT[2])} 个`,
@@ -213,7 +225,7 @@ export const TITLES = [
   {
     id: "kill1",
     name: "怪物猎人",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.kills[0],
     series: "kills",
     tier: 1,
     desc: `累计击杀达到 ${fmt(MILESTONE.KILL_COUNT[0])} 次`,
@@ -224,7 +236,7 @@ export const TITLES = [
   {
     id: "kill2",
     name: "怪物公敌",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.kills[1],
     series: "kills",
     tier: 2,
     desc: `累计击杀达到 ${fmt(MILESTONE.KILL_COUNT[1])} 次`,
@@ -235,7 +247,7 @@ export const TITLES = [
   {
     id: "kill3",
     name: "猎魔人",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.kills[2],
     series: "kills",
     tier: 3,
     desc: `累计击杀达到 ${fmt(MILESTONE.KILL_COUNT[2])} 次`,
@@ -247,7 +259,7 @@ export const TITLES = [
   {
     id: "death1",
     name: "试试就逝世",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.deaths[0],
     series: "deaths",
     tier: 1,
     desc: `累计死亡达到 ${fmt(MILESTONE.DEATH_COUNT[0])} 次`,
@@ -258,7 +270,7 @@ export const TITLES = [
   {
     id: "death2",
     name: "影逝二度",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.deaths[1],
     series: "deaths",
     tier: 2,
     desc: `累计死亡达到 ${fmt(MILESTONE.DEATH_COUNT[1])} 次`,
@@ -269,7 +281,7 @@ export const TITLES = [
   {
     id: "death3",
     name: "菜月昴",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.deaths[2],
     series: "deaths",
     tier: 3,
     desc: `累计死亡达到 ${fmt(MILESTONE.DEATH_COUNT[2])} 次`,
@@ -281,7 +293,7 @@ export const TITLES = [
   {
     id: "rich1",
     name: "百万富翁",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.money[0],
     series: "money",
     tier: 1,
     desc: `持有金币达到 ${fmt(MILESTONE.MONEY[0])} 金币`,
@@ -291,7 +303,7 @@ export const TITLES = [
   {
     id: "rich2",
     name: "千万富翁",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.money[1],
     series: "money",
     tier: 2,
     desc: `持有金币达到 ${fmt(MILESTONE.MONEY[1])} 金币`,
@@ -301,7 +313,7 @@ export const TITLES = [
   {
     id: "rich3",
     name: "亿万富翁",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.money[2],
     series: "money",
     tier: 3,
     desc: `持有金币达到 ${fmt(MILESTONE.MONEY[2])} 金币`,
@@ -312,7 +324,7 @@ export const TITLES = [
   {
     id: "lot1",
     name: "赌徒",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.lottery[0],
     series: "lottery",
     tier: 1,
     desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT[0]} 次`,
@@ -323,7 +335,7 @@ export const TITLES = [
   {
     id: "lot2",
     name: "赌神",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.lottery[1],
     series: "lottery",
     tier: 2,
     desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT[1]} 次`,
@@ -334,7 +346,7 @@ export const TITLES = [
   {
     id: "lot3",
     name: "狂赌之渊",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.lottery[2],
     series: "lottery",
     tier: 3,
     desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT[2]} 次`,
@@ -346,7 +358,7 @@ export const TITLES = [
   {
     id: "ach1",
     name: "成就猎人",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.achieve[0],
     series: "achieve",
     tier: 1,
     desc: `解锁 ${MILESTONE.ACHIEVE_COUNT[0]} 个成就`,
@@ -357,7 +369,7 @@ export const TITLES = [
   {
     id: "ach2",
     name: "黄金玩家",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.achieve[1],
     series: "achieve",
     tier: 2,
     desc: `解锁 ${MILESTONE.ACHIEVE_COUNT[1]} 个成就`,
@@ -368,7 +380,7 @@ export const TITLES = [
   {
     id: "ach3",
     name: "白金玩家",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.achieve[2],
     series: "achieve",
     tier: 3,
     desc: `解锁 ${MILESTONE.ACHIEVE_COUNT[2]} 个成就（当前成就共 66 个，需后续新增成就）`,
@@ -380,7 +392,7 @@ export const TITLES = [
   {
     id: "tal1",
     name: "略有小成",
-    color: TIER_COLORS[0],
+    color: SERIES_TIER_COLORS.talent[0],
     series: "talent",
     tier: 1,
     desc: `任意天赋达到 ${MILESTONE.TALENT_LEVEL[0]} 级`,
@@ -390,7 +402,7 @@ export const TITLES = [
   {
     id: "tal2",
     name: "登峰造极",
-    color: TIER_COLORS[1],
+    color: SERIES_TIER_COLORS.talent[1],
     series: "talent",
     tier: 2,
     desc: `任意天赋达到 ${MILESTONE.TALENT_LEVEL[1]} 级`,
@@ -400,7 +412,7 @@ export const TITLES = [
   {
     id: "tal3",
     name: "六边形战士",
-    color: TIER_COLORS[2],
+    color: SERIES_TIER_COLORS.talent[2],
     series: "talent",
     tier: 3,
     desc: `所有天赋均达到 ${MILESTONE.TALENT_LEVEL[1]} 级`,
