@@ -471,6 +471,8 @@ function getTitleShapeColor(playerId) {
 }
 
 function buildTitleShape(player) {
+  const online = [...world.getPlayers()];
+  if (online.length <= 1) return; // 单人时不显示（空 visibleTo 会变成全服可见）
   const text = getTitleShapeText(player.id);
   if (!text) return;
   if (player.isSneaking) return; // 下蹲时不显示
@@ -484,6 +486,7 @@ function buildTitleShape(player) {
     shape.backgroundColorOverride = { red: 0, green: 0, blue: 0, alpha: 0.45 };
     shape.depthTest = false;
     shape.attachedTo = player;
+    shape.visibleTo = online.filter((p) => p.id !== player.id); // 本人不可见
     world.primitiveShapesManager.addText(shape, player.dimension);
     titleShapes.set(player.id, shape);
   } catch (e) {
