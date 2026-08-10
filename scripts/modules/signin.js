@@ -115,26 +115,7 @@ export function showSigninForm(player) {
       );
       form.label(statusText).spacer();
 
-      // --- 服务器公告 ---
-      form.label("§6§l【服务器公告】");
-      form.spacer();
-      for (const line of SERVER_ANNOUNCEMENTS) {
-        form.label(line);
-        form.spacer();
-      }
-
-      // --- 服务器更新日志 ---
-      form.label("§6§l【服务器更新日志】");
-      form.spacer();
-      for (const entry of SERVER_CHANGELOGS) {
-        form.label(`§e${entry.version}`);
-        form.spacer();
-        for (const line of entry.items) {
-          form.label(line);
-          form.spacer();
-        }
-      }
-
+      // --- 签到按钮前置 ---
       form.button(alreadySigned ? "关闭" : "签到", () => {
         if (signed) return;
         signed = true;
@@ -156,6 +137,32 @@ export function showSigninForm(player) {
         );
         form.close();
       });
+      form.spacer().divider().spacer();
+
+      // --- 服务器公告 ---
+      form.label("§6§l【服务器公告】");
+      form.spacer();
+      for (const line of SERVER_ANNOUNCEMENTS) {
+        form.label(line);
+        form.spacer();
+      }
+
+      // --- 服务器更新日志 ---
+      form.label("§6§l【服务器更新日志】");
+      form.spacer();
+      for (const entry of SERVER_CHANGELOGS) {
+        form.label(`§e${entry.version}`);
+        form.spacer();
+        for (const line of entry.items) {
+          form.label(line);
+          form.spacer();
+        }
+      }
+
+      // 未签到时提供底部关闭按钮，方便只读公告/更新日志
+      if (!alreadySigned) {
+        form.spacer().button("关闭", () => form.close());
+      }
 
       // 进服后每 tick 检查一次：
       // - UserBusy（玩家正忙/聊天框打开/其他界面占用）：表单未真正展示，下一 tick 继续尝试
