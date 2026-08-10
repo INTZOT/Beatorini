@@ -41,6 +41,7 @@ export const ISLAND_ABANDON_PREFIX = "island:abandon_date_"; // 玩家最近一�
 export const TITLE_PREFIX = "title_";
 export const DEFAULT_TITLE = "【玩家】";
 export const TITLE_NOTIFY_PREFIX = "title:notify_"; // 已全服通报过的称号 id 列表（JSON）
+export const TITLE_MONEY_PEAK_PREFIX = "title:money_peak_"; // 历史最高持有金币
 
 // --- 签到 ---
 export const PLAYER_SIGNIN_DATE = "island:signin_date_";

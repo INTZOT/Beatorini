@@ -4,6 +4,7 @@ import {
   TITLE_PREFIX,
   DEFAULT_TITLE,
   TITLE_NOTIFY_PREFIX,
+  TITLE_MONEY_PEAK_PREFIX,
   STATS_PLAYTIME_PREFIX,
   STATS_KILLS_PREFIX,
   STATS_MINED_PREFIX,
@@ -55,6 +56,16 @@ function hasAllTalentLevel(player, level) {
 }
 function maxTalentLevel(player) {
   return Math.max(...TALENT_IDS.map((id) => getTalentLevel(player.id, id)));
+}
+/** 历史最高持有金币：超过峰值时更新并返回峰值（金币系列按峰值永久解锁） */
+function getMoneyPeak(player) {
+  const current = getPlayerMoney(player);
+  const peak = world.getDynamicProperty(TITLE_MONEY_PEAK_PREFIX + player.id) ?? 0;
+  if (current > peak) {
+    world.setDynamicProperty(TITLE_MONEY_PEAK_PREFIX + player.id, current);
+    return current;
+  }
+  return peak;
 }
 // --- 称号目录（系列 + 三档） ---
 // id: 存储标识；series: 系列；tier: 档位（1~3）
@@ -297,8 +308,8 @@ export const TITLES = [
     series: "money",
     tier: 1,
     desc: `持有金币达到 ${fmt(MILESTONE.MONEY[0])} 金币`,
-    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY[0],
-    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY[0]),
+    owned: (p) => getMoneyPeak(p) >= MILESTONE.MONEY[0],
+    progress: (p) => Math.min(1, getMoneyPeak(p) / MILESTONE.MONEY[0]),
   },
   {
     id: "rich2",
@@ -307,8 +318,8 @@ export const TITLES = [
     series: "money",
     tier: 2,
     desc: `持有金币达到 ${fmt(MILESTONE.MONEY[1])} 金币`,
-    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY[1],
-    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY[1]),
+    owned: (p) => getMoneyPeak(p) >= MILESTONE.MONEY[1],
+    progress: (p) => Math.min(1, getMoneyPeak(p) / MILESTONE.MONEY[1]),
   },
   {
     id: "rich3",
@@ -317,8 +328,8 @@ export const TITLES = [
     series: "money",
     tier: 3,
     desc: `持有金币达到 ${fmt(MILESTONE.MONEY[2])} 金币`,
-    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY[2],
-    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY[2]),
+    owned: (p) => getMoneyPeak(p) >= MILESTONE.MONEY[2],
+    progress: (p) => Math.min(1, getMoneyPeak(p) / MILESTONE.MONEY[2]),
   },
   // --- 抽奖系列 ---
   {
@@ -547,6 +558,7 @@ export function setWornTitle(playerId, titleId) {
 // ============================================================
 
 export function showTitleMenu(player, backFn) {
+  getMoneyPeak(player); // 打开界面时先刷新历史峰值
   const wornRaw = world.getDynamicProperty(TITLE_PREFIX + player.id) || "";
   const ownedTitles = TITLES.filter((t) => t.owned(player));
 
@@ -613,6 +625,7 @@ export function init() {
   // 二档及以上称号解锁全服通报（每 10 秒检查，首次解锁只通报一次）
   system.runInterval(() => {
     for (const p of world.getPlayers()) {
+      getMoneyPeak(p); // 刷新历史最高金币
       let notified = [];
       const rawNotify = world.getDynamicProperty(TITLE_NOTIFY_PREFIX + p.id);
       if (typeof rawNotify === "string") {
