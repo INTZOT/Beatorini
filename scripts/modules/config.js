@@ -54,6 +54,7 @@ export const STATS_MINED_PREFIX = "stats:mined_";
 export const STATS_PLACED_PREFIX = "stats:placed_";
 export const STATS_DEATHS_PREFIX = "stats:deaths_";
 export const STATS_LOTTERY_PREFIX = "stats:lottery_";
+export const PLAYER_NAME_PREFIX = "player:name_"; // 玩家 ID → 名字映射（离线显示用）
 
 // --- 天赋 ---
 export const TALENT_PREFIX = "talent:lv_";

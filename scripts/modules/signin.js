@@ -19,11 +19,10 @@ const SERVER_ANNOUNCEMENTS = [
 // --- 进入表单的服务器更新日志（最新在上） ---
 const SERVER_CHANGELOGS = [
   {
-    version: "Release 4.9.3",
+    version: "Release 4.9.4",
     items: [
-      "§a▸ 调整",
-      "  §7空桶回收黑曜石改为手持空桶右键触发",
-      "  §7玩法提示重置，新增 20 条 tips",
+      "§e▸ 修复",
+      "  §7排行榜离线玩家显示真实名字（自动绑定 ID→名字）",
     ],
   },
 ];

@@ -5,6 +5,7 @@ import {
   STATS_MINED_PREFIX,
   STATS_PLACED_PREFIX,
   STATS_DEATHS_PREFIX,
+  PLAYER_NAME_PREFIX,
 } from "./config.js";
 
 // --- 统计类别定义 ---
@@ -57,7 +58,32 @@ export function addStat(playerId, prefix, amount) {
   world.setDynamicProperty(prefix + playerId, getStat(playerId, prefix) + amount);
 }
 
+/** 自动建立/刷新 玩家 ID → 名字 映射（离线显示用） */
+export function bindPlayerName(player) {
+  if (!player || !player.id || !player.name) return;
+  try {
+    world.setDynamicProperty(PLAYER_NAME_PREFIX + player.id, player.name);
+  } catch (e) {}
+}
+
+/** 读取已绑定的名字，无映射返回 undefined */
+export function getBoundPlayerName(playerId) {
+  const name = world.getDynamicProperty(PLAYER_NAME_PREFIX + playerId);
+  return typeof name === "string" && name ? name : undefined;
+}
+
 export function init() {
+  // --- 玩家上线自动绑定 ID → 名字 ---
+  world.afterEvents.playerSpawn.subscribe((event) => {
+    bindPlayerName(event.player);
+  });
+  // reload 后为已在线的玩家补录
+  world.afterEvents.worldLoad.subscribe(() => {
+    system.runTimeout(() => {
+      for (const p of world.getPlayers()) bindPlayerName(p);
+    }, 10);
+  });
+
   // --- 在线时长计时（每秒） ---
   system.runInterval(() => {
     for (const player of world.getPlayers()) {
@@ -89,9 +115,10 @@ export function init() {
 }
 
 /**
- * 通过 ID 获取玩家名（在线取真实名，离线截断显示）
+ * 通过 ID 获取玩家名（在线取真实名，离线取绑定名，均无则截断 ID）
  */
 export function getPlayerNameById(playerId) {
   const player = [...world.getPlayers()].find((p) => p.id === playerId);
-  return player ? player.name : playerId.slice(0, 8) + "...";
+  if (player) return player.name;
+  return getBoundPlayerName(playerId) || playerId.slice(0, 8) + "...";
 }
