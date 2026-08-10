@@ -37,25 +37,19 @@ const COLOR_MAP = {
   f: { red: 1, green: 1, blue: 1, alpha: 1 },
 };
 
-function stripColorCodes(text) {
-  return String(text).replace(/§./g, "");
-}
-
-/** 头顶文字：目录称号显示【名】，管理员自定义称号去掉颜色代码 */
+/** 头顶文字：仅目录称号显示【名】，无称号不显示 */
 function getTitleShapeText(playerId) {
   const raw = world.getDynamicProperty(TITLE_PREFIX + playerId) || "";
   const t = TITLES.find((x) => x.id === raw);
-  if (t) return `【${t.name}】`;
-  return raw ? stripColorCodes(raw) : "";
+  return t ? `【${t.name}】` : "";
 }
 
-/** 取称号颜色：目录称号用配置色，自定义称号取第一个颜色代码，否则白色 */
+/** 取称号颜色：目录称号用配置色，否则白色 */
 function getTitleShapeColor(playerId) {
   const raw = world.getDynamicProperty(TITLE_PREFIX + playerId) || "";
   const t = TITLES.find((x) => x.id === raw);
   if (t) return COLOR_MAP[t.color.charAt(1)] || DEFAULT_SHAPE_COLOR;
-  const m = String(raw).match(/§(.)/);
-  return (m && COLOR_MAP[m[1]]) || DEFAULT_SHAPE_COLOR;
+  return DEFAULT_SHAPE_COLOR;
 }
 
 function buildTitleShape(player) {
@@ -99,74 +93,17 @@ function refreshOnlinePlayer(playerId) {
   if (player) syncTitleShape(player);
 }
 
-/** 读取当前佩戴的称号显示文本（兼容旧版管理员直接设置的原始文本） */
+/** 读取当前佩戴的称号显示文本（仅支持称号目录内的称号） */
 export function getPlayerTitle(playerId) {
   const raw = world.getDynamicProperty(TITLE_PREFIX + playerId) || "";
   const t = TITLES.find((x) => x.id === raw);
-  if (t) return `${t.color}【${t.name}】§r`;
-  return raw ? `${raw}§r` : `${DEFAULT_TITLE}§r`;
-}
-
-/** 管理员直接设置自定义称号文本 */
-export function setPlayerTitle(playerId, title) {
-  world.setDynamicProperty(TITLE_PREFIX + playerId, title);
-  refreshOnlinePlayer(playerId);
+  return t ? `${t.color}【${t.name}】§r` : `${DEFAULT_TITLE}§r`;
 }
 
 /** 玩家佩戴/卸下称号（存称号 id，空字符串卸下） */
 export function setWornTitle(playerId, titleId) {
   world.setDynamicProperty(TITLE_PREFIX + playerId, titleId || "");
   refreshOnlinePlayer(playerId);
-}
-
-/**
- * 处理 #title 命令
- * @param {import("@minecraft/server").Player} player — 执行者（需有 op tag）
- * @param {string} message — 完整消息 "#title @<玩家名> <称号>"
- */
-export function handleTitleCommand(player, message) {
-  if (!player.hasTag("op")) {
-    player.sendMessage("§c你没有权限使用此命令！");
-    return;
-  }
-  let input = message.slice(7).trim();
-  if (input.startsWith("@")) input = input.slice(1);
-  if (!input) {
-    player.sendMessage("§c用法: #title @<玩家名> <称号>");
-    return;
-  }
-
-  // 按名字长度降序排列，优先匹配长名
-  const online = [...world.getPlayers()].sort(
-    (a, b) => b.name.length - a.name.length
-  );
-  let target = null,
-    title = "";
-  const lowerInput = input.toLowerCase();
-  for (const p of online) {
-    const lowerName = p.name.toLowerCase();
-    if (lowerInput.startsWith(lowerName)) {
-      const after = input.slice(p.name.length);
-      if (after === "" || after.startsWith(" ")) {
-        target = p;
-        title = after.trim();
-        break;
-      }
-    }
-  }
-
-  if (!target) {
-    player.sendMessage("§c找不到指定玩家，请检查玩家名是否正确");
-    return;
-  }
-  if (!title) {
-    player.sendMessage("§c用法: #title @<玩家名> <称号>");
-    return;
-  }
-
-  setPlayerTitle(target.id, title);
-  player.sendMessage(`§a已将 ${target.name} 的称号设置为: ${title}`);
-  target.sendMessage(`§a你的称号已被管理员设置为: ${title}`);
 }
 
 // ============================================================
@@ -178,7 +115,7 @@ export function showTitleMenu(player, backFn) {
   const wornTitle = TITLES.find((x) => x.id === wornRaw);
   const wornText = wornTitle
     ? `${wornTitle.color}【${wornTitle.name}】§r`
-    : wornRaw || `${DEFAULT_TITLE}§r`;
+    : `${DEFAULT_TITLE}§r`;
 
   const NO_TITLE_INDEX = TITLES.length; // 下拉末项：无称号
   const items = TITLES.map((t, i) => ({
@@ -221,12 +158,14 @@ export function showTitleMenu(player, backFn) {
   form.show().catch((e) => console.warn("Form show failed:", e));
 }
 
-/** 初始化：没有存储过称号的玩家自动佩戴「萌新」 */
+/** 初始化：无有效称号（含旧版原始文本）的玩家自动佩戴「萌新」 */
 export function init() {
   world.afterEvents.playerSpawn.subscribe((event) => {
     const player = event.player;
     if (!player) return;
-    if (world.getDynamicProperty(TITLE_PREFIX + player.id) === undefined) {
+    const raw = world.getDynamicProperty(TITLE_PREFIX + player.id);
+    const valid = TITLES.some((t) => t.id === raw);
+    if (raw === undefined || !valid) {
       setWornTitle(player.id, "newbie");
     } else {
       syncTitleShape(player);

@@ -1,7 +1,7 @@
 import { system, world, ItemStack, EntityInitializationCause } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
 import { getPlayerMoney } from "./money.js";
-import { getPlayerTitle, handleTitleCommand, showTitleMenu } from "./title.js";
+import { getPlayerTitle, showTitleMenu } from "./title.js";
 import {
   getPlayerBoundIndex,
   handleLobby,
@@ -415,11 +415,6 @@ export function init() {
       let targetName = event.message.slice(10).trim();
       if (targetName.startsWith("@")) targetName = targetName.slice(1);
       handleTransfer(player, targetName);
-      return;
-    }
-    if (event.message.startsWith("#title ")) {
-      event.cancel = true;
-      handleTitleCommand(player, event.message);
       return;
     }
     if (event.message === "#vaulttest") {
