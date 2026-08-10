@@ -1,7 +1,7 @@
 import { system, world, ItemStack, EntityInitializationCause } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
 import { getPlayerMoney } from "./money.js";
-import { getPlayerTitle, handleTitleCommand } from "./title.js";
+import { getPlayerTitle, handleTitleCommand, showTitleMenu } from "./title.js";
 import {
   getPlayerBoundIndex,
   handleLobby,
@@ -64,6 +64,10 @@ function showIslandMenu(player) {
   f = f.button("成就列表", () => {
     f.close();
     system.runTimeout(() => showAchievementsMenu(player), 2);
+  });
+  f = f.button("称号", () => {
+    f.close();
+    system.runTimeout(() => showTitleMenu(player, showIslandMenu), 2);
   });
   f = f.button("排行榜", () => {
     f.close();

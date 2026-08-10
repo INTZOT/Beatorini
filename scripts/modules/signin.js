@@ -19,6 +19,15 @@ const SERVER_ANNOUNCEMENTS = [
 // --- 进入表单的服务器更新日志（最新在上） ---
 const SERVER_CHANGELOGS = [
   {
+    version: "Release 4.9.0",
+    items: [
+      "§a▸ 称号系统上线",
+      "  §7主菜单新增「称号」入口，自由佩戴已解锁称号",
+      "  §7初始称号「萌新」人人拥有",
+      "  §7更多称号按成就/统计/天赋/市场/抽奖/签到等条件解锁",
+    ],
+  },
+  {
     version: "Release 4.8.0",
     items: [
       "§a▸ 市场优化",
