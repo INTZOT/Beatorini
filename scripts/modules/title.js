@@ -1,5 +1,5 @@
 import { world, system, TextPrimitive } from "@minecraft/server";
-import { CustomForm, ObservableNumber } from "@minecraft/server-ui";
+import { CustomForm, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import {
   TITLE_PREFIX,
   DEFAULT_TITLE,
@@ -554,11 +554,21 @@ export function showTitleMenu(player, backFn) {
     ? ownedTitles.findIndex((t) => t.id === wornTitle.id)
     : NO_TITLE_INDEX;
   const selected = new ObservableNumber(wornIndex, { clientWritable: true });
+  const conditionLabel = new ObservableString(
+    wornTitle ? `§7获取条件: ${wornTitle.desc}` : "§7未佩戴称号"
+  );
+  // 下拉选择变化时同步更新获取条件
+  selected.subscribe((idx) => {
+    const t = idx >= 0 && idx < ownedTitles.length ? ownedTitles[idx] : null;
+    conditionLabel.setData(t ? `§7获取条件: ${t.desc}` : "§7未佩戴称号");
+  });
 
   let form = new CustomForm(player, "称号")
     .label(`§e当前称号: ${wornText}`)
     .spacer()
     .dropdown("选择称号", selected, items)
+    .spacer()
+    .label(conditionLabel)
     .spacer()
     .button("保存", () => {
       const idx = selected.getData();
