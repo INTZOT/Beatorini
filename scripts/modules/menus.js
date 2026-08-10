@@ -489,30 +489,25 @@ export function init() {
   });
 
   // ============================================================
-  // 站在黑曜石上右键空桶 → 回收为岩浆桶
+  // 手持空桶右键黑曜石 → 回收为岩浆桶
   // ============================================================
-  world.afterEvents.itemUse.subscribe((event) => {
-    const { source: player, itemStack } = event;
-    if (itemStack.typeId !== "minecraft:bucket") return;
+  world.afterEvents.playerInteractWithBlock.subscribe((event) => {
+    const { player, block, itemStack } = event;
+    if (!itemStack || itemStack.typeId !== "minecraft:bucket") return;
+    if (block.typeId !== "minecraft:obsidian") return;
 
-    const belowPos = {
-      x: Math.floor(player.location.x),
-      y: Math.floor(player.location.y) - 1,
-      z: Math.floor(player.location.z),
-    };
-    const blockBelow = player.dimension.getBlock(belowPos);
-    if (!blockBelow || blockBelow.typeId !== "minecraft:obsidian") return;
-
-    blockBelow.setType("minecraft:air");
+    block.setType("minecraft:air");
 
     const inventory = player.getComponent("inventory").container;
     const slot = player.selectedSlotIndex;
     const handItem = inventory.getItem(slot);
-    if (handItem.amount > 1) {
-      handItem.amount--;
-      inventory.setItem(slot, handItem);
-    } else {
-      inventory.setItem(slot, undefined);
+    if (handItem && handItem.typeId === "minecraft:bucket") {
+      if (handItem.amount > 1) {
+        handItem.amount--;
+        inventory.setItem(slot, handItem);
+      } else {
+        inventory.setItem(slot, undefined);
+      }
     }
 
     const lavaBucket = new ItemStack("minecraft:lava_bucket", 1);
@@ -562,7 +557,7 @@ export function init() {
     "§etips: 输入 #visit @<玩家名> 申请访问他人岛屿！",
     "§etips: 输入 #join @<玩家名> 申请加入他人岛屿！",
     "§etips: 岛屿会定期刷新流浪商人哦~",
-    "§etips: 别把岩浆变成黑曜石哦~(站在黑曜石上手持空桶右键可回收岩浆)",
+    "§etips: 别把岩浆变成黑曜石哦~(手持空桶右键黑曜石可回收岩浆)",
     "§etips: 刷石机有概率生成矿物哦~",
   ];
 
