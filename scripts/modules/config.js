@@ -81,6 +81,7 @@ export const SIGNIN_MAX_REWARD = 5000; // 签到奖励上限
 export const RECYCLE_WINDOW = 160000; // 原价窗口：每种物品当日累计金币达到该值前保持原价
 export const RECYCLE_DAILY_CAP = 310000; // 第五次降价后归零，单种物品当日收益上限
 export const RECYCLE_CUM_PREFIX = "recycle:cum_"; // 个人当日回收累计金额（按玩家存储 JSON）
+export const RECYCLE_CAP_FLAG_PREFIX = "recycle:cap_"; // 曾将单件物品卖至金额上限的永久标记
 
 // --- 死亡惩罚 ---
 export const DEATH_PENALTY_BASE = 5000; // 死亡固定底价

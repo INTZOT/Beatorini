@@ -10,7 +10,8 @@ import {
   STATS_DEATHS_PREFIX,
   STATS_LOTTERY_PREFIX,
   PLAYER_SIGNIN_STREAK,
-  MARKET_SOLD_PREFIX,
+  RECYCLE_DAILY_CAP,
+  RECYCLE_CAP_FLAG_PREFIX,
 } from "./config.js";
 import { getStat } from "./stats.js";
 import { getAchievements } from "./achievements.js";
@@ -26,7 +27,6 @@ const MILESTONE = {
   KILL_COUNT: 100, // 累计击杀 100
   DEATH_COUNT: 50, // 累计死亡 50（致敬）
   MONEY: 1000000, // 持有金币 100 万
-  SOLD_COUNT: 100, // 市场累计售出 100 件
   ACHIEVE_COUNT: 30, // 解锁 30 个成就
   TALENT_LEVEL: 100, // 任意天赋 100 级
   LOTTERY_COUNT: 50, // 累计抽奖 50 次
@@ -45,7 +45,7 @@ export const TITLES = [
   },
   {
     id: "veteran",
-    name: "老玩家",
+    name: "老资历",
     color: "§9",
     desc: `累计在线达到 ${MILESTONE.PLAY_HOURS} 小时`,
     owned: (p) => getStat(p.id, STATS_PLAYTIME_PREFIX) >= MILESTONE.PLAY_HOURS * 3600,
@@ -54,7 +54,7 @@ export const TITLES = [
   },
   {
     id: "signer",
-    name: "签到达人",
+    name: "打卡机",
     color: "§e",
     desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS} 天`,
     owned: (p) =>
@@ -96,7 +96,7 @@ export const TITLES = [
   },
   {
     id: "phoenix",
-    name: "凤凰涅槃",
+    name: "菜月昴",
     color: "§d",
     desc: `累计死亡达到 ${MILESTONE.DEATH_COUNT} 次（致敬）`,
     owned: (p) => getStat(p.id, STATS_DEATHS_PREFIX) >= MILESTONE.DEATH_COUNT,
@@ -105,7 +105,7 @@ export const TITLES = [
   },
   {
     id: "rich",
-    name: "富甲一方",
+    name: "百万富翁",
     color: "§6",
     desc: `持有金币达到 ${MILESTONE.MONEY.toLocaleString("zh-CN")} 金币`,
     owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY,
@@ -113,22 +113,16 @@ export const TITLES = [
   },
   {
     id: "tycoon",
-    name: "市场大亨",
+    name: "垄断者",
     color: "§b",
-    desc: `市场累计售出 ${MILESTONE.SOLD_COUNT} 件商品`,
-    owned: (p) =>
-      (world.getDynamicProperty(MARKET_SOLD_PREFIX + p.id) ?? 0) >=
-      MILESTONE.SOLD_COUNT,
+    desc: `将单件物品卖至 ${RECYCLE_DAILY_CAP.toLocaleString("zh-CN")} 金币上限`,
+    owned: (p) => world.getDynamicProperty(RECYCLE_CAP_FLAG_PREFIX + p.id) === true,
     progress: (p) =>
-      Math.min(
-        1,
-        (world.getDynamicProperty(MARKET_SOLD_PREFIX + p.id) ?? 0) /
-          MILESTONE.SOLD_COUNT
-      ),
+      world.getDynamicProperty(RECYCLE_CAP_FLAG_PREFIX + p.id) === true ? 1 : 0,
   },
   {
     id: "lucky",
-    name: "抽奖狂魔",
+    name: "赌徒",
     color: "§5",
     desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT} 次`,
     owned: (p) => getStat(p.id, STATS_LOTTERY_PREFIX) >= MILESTONE.LOTTERY_COUNT,
@@ -146,7 +140,7 @@ export const TITLES = [
   },
   {
     id: "talent_master",
-    name: "天赋大师",
+    name: "天赋哥",
     color: "§3",
     desc: `任意天赋达到 ${MILESTONE.TALENT_LEVEL} 级`,
     owned: (p) =>
