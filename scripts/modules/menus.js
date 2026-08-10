@@ -62,7 +62,7 @@ function showIslandMenu(player) {
       2
     );
   });
-  f = f.button("成长", () => {
+  f = f.button("个人", () => {
     f.close();
     system.runTimeout(() => showGrowthMenu(player), 2);
   });
@@ -89,7 +89,7 @@ function showIslandMenu(player) {
 // ============================================================
 
 function showGrowthMenu(player) {
-  let f = new CustomForm(player, "成长");
+  let f = new CustomForm(player, "个人");
   f = f.label("§7成就 / 称号 / 天赋 / 排行榜");
   f = f.spacer();
   f = f.button("成就列表", () => {
