@@ -11,31 +11,47 @@ import {
   STATS_LOTTERY_PREFIX,
   PLAYER_SIGNIN_STREAK,
   RECYCLE_DAILY_CAP,
-  RECYCLE_CAP_FLAG_PREFIX,
+  RECYCLE_CAP_BEST_PREFIX,
 } from "./config.js";
 import { getStat } from "./stats.js";
 import { getAchievements } from "./achievements.js";
 import { getTalentLevel } from "./talent.js";
 import { getPlayerMoney } from "./money.js";
 
-// --- 里程碑阈值（可按需调整） ---
+// --- 里程碑阈值（可按需调整，数组第 N 项对应第 N 档） ---
 const MILESTONE = {
-  PLAY_HOURS: 100, // 累计在线 100 小时
-  SIGNIN_DAYS: 7, // 连续签到 7 天
-  PLACE_COUNT: 10000, // 累计放置 10000 方块
-  MINE_COUNT: 10000, // 累计挖掘 10000 方块
-  KILL_COUNT: 100, // 累计击杀 100
-  DEATH_COUNT: 50, // 累计死亡 50（致敬）
-  MONEY: 1000000, // 持有金币 100 万（百万富翁）
-  MONEY_TEN: 10000000, // 持有金币 1000 万（千万富翁）
-  MONEY_HUNDRED: 100000000, // 持有金币 1 亿（亿万富翁）
-  ACHIEVE_COUNT: 30, // 解锁 30 个成就
-  TALENT_LEVEL: 100, // 任意天赋 100 级
-  LOTTERY_COUNT: 50, // 累计抽奖 50 次
+  PLAY_HOURS: [50, 100, 200], // 在线时长（小时）
+  SIGNIN_DAYS: [3, 7, 30], // 连续签到（天）
+  PLACE_COUNT: [10000, 100000, 1000000], // 累计放置方块
+  MINE_COUNT: [10000, 100000, 1000000], // 累计挖掘方块
+  KILL_COUNT: [1000, 10000, 100000], // 累计击杀
+  DEATH_COUNT: [100, 1000, 10000], // 累计死亡
+  MONEY: [1000000, 10000000, 100000000], // 持有金币
+  SELL_COUNT: [1, 5, 10], // 单日卖断物品数
+  LOTTERY_COUNT: [10, 100, 1000], // 累计抽奖次数
+  ACHIEVE_COUNT: [10, 50, 100], // 解锁成就数（当前成就共 66 个，100 档暂不可达）
+  TALENT_LEVEL: [60, 120], // 天赋等级（第三档要求全部满级）
 };
 
-// --- 称号目录 ---
-// id: 存储标识；name: 称号名；color: 颜色代码；desc: 解锁说明
+const TIER_COLORS = ["§7", "§e", "§5"]; // 一/二/三档颜色
+const TALENT_IDS = ["speed", "haste", "strength", "jump", "resistance", "health"];
+const fmt = (n) => n.toLocaleString("zh-CN");
+
+function hasAnyTalentLevel(player, level) {
+  return TALENT_IDS.some((id) => getTalentLevel(player.id, id) >= level);
+}
+function hasAllTalentLevel(player, level) {
+  return TALENT_IDS.every((id) => getTalentLevel(player.id, id) >= level);
+}
+function maxTalentLevel(player) {
+  return Math.max(...TALENT_IDS.map((id) => getTalentLevel(player.id, id)));
+}
+function sellBestCount(player) {
+  return world.getDynamicProperty(RECYCLE_CAP_BEST_PREFIX + player.id) ?? 0;
+}
+
+// --- 称号目录（系列 + 三档） ---
+// id: 存储标识；series: 系列；tier: 档位（1~3）
 // owned(player): 是否已解锁；progress(player): 0~1 进度（可选）
 export const TITLES = [
   {
@@ -45,140 +61,388 @@ export const TITLES = [
     desc: "人人皆从萌新开始（初始称号）",
     owned: () => true,
   },
+  // --- 在线时长系列 ---
   {
-    id: "veteran",
-    name: "老资历",
-    color: "§9",
-    desc: `累计在线达到 ${MILESTONE.PLAY_HOURS} 小时`,
-    owned: (p) => getStat(p.id, STATS_PLAYTIME_PREFIX) >= MILESTONE.PLAY_HOURS * 3600,
+    id: "play1",
+    name: "小资历",
+    color: TIER_COLORS[0],
+    series: "playtime",
+    tier: 1,
+    desc: `累计在线达到 ${MILESTONE.PLAY_HOURS[0]} 小时`,
+    owned: (p) => getStat(p.id, STATS_PLAYTIME_PREFIX) >= MILESTONE.PLAY_HOURS[0] * 3600,
     progress: (p) =>
-      Math.min(1, getStat(p.id, STATS_PLAYTIME_PREFIX) / (MILESTONE.PLAY_HOURS * 3600)),
+      Math.min(1, getStat(p.id, STATS_PLAYTIME_PREFIX) / (MILESTONE.PLAY_HOURS[0] * 3600)),
   },
   {
-    id: "signer",
-    name: "打卡机",
-    color: "§e",
-    desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS} 天`,
+    id: "play2",
+    name: "老资历",
+    color: TIER_COLORS[1],
+    series: "playtime",
+    tier: 2,
+    desc: `累计在线达到 ${MILESTONE.PLAY_HOURS[1]} 小时`,
+    owned: (p) => getStat(p.id, STATS_PLAYTIME_PREFIX) >= MILESTONE.PLAY_HOURS[1] * 3600,
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_PLAYTIME_PREFIX) / (MILESTONE.PLAY_HOURS[1] * 3600)),
+  },
+  {
+    id: "play3",
+    name: "远古资历",
+    color: TIER_COLORS[2],
+    series: "playtime",
+    tier: 3,
+    desc: `累计在线达到 ${MILESTONE.PLAY_HOURS[2]} 小时`,
+    owned: (p) => getStat(p.id, STATS_PLAYTIME_PREFIX) >= MILESTONE.PLAY_HOURS[2] * 3600,
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_PLAYTIME_PREFIX) / (MILESTONE.PLAY_HOURS[2] * 3600)),
+  },
+  // --- 连续签到系列 ---
+  {
+    id: "sign1",
+    name: "打卡王",
+    color: TIER_COLORS[0],
+    series: "signin",
+    tier: 1,
+    desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS[0]} 天`,
     owned: (p) =>
       (world.getDynamicProperty(PLAYER_SIGNIN_STREAK + p.id) ?? 0) >=
-      MILESTONE.SIGNIN_DAYS,
+      MILESTONE.SIGNIN_DAYS[0],
     progress: (p) =>
       Math.min(
         1,
         (world.getDynamicProperty(PLAYER_SIGNIN_STREAK + p.id) ?? 0) /
-          MILESTONE.SIGNIN_DAYS
+          MILESTONE.SIGNIN_DAYS[0]
       ),
   },
   {
-    id: "builder",
+    id: "sign2",
+    name: "打卡狂魔",
+    color: TIER_COLORS[1],
+    series: "signin",
+    tier: 2,
+    desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS[1]} 天`,
+    owned: (p) =>
+      (world.getDynamicProperty(PLAYER_SIGNIN_STREAK + p.id) ?? 0) >=
+      MILESTONE.SIGNIN_DAYS[1],
+    progress: (p) =>
+      Math.min(
+        1,
+        (world.getDynamicProperty(PLAYER_SIGNIN_STREAK + p.id) ?? 0) /
+          MILESTONE.SIGNIN_DAYS[1]
+      ),
+  },
+  {
+    id: "sign3",
+    name: "全勤奖",
+    color: TIER_COLORS[2],
+    series: "signin",
+    tier: 3,
+    desc: `连续签到达到 ${MILESTONE.SIGNIN_DAYS[2]} 天`,
+    owned: (p) =>
+      (world.getDynamicProperty(PLAYER_SIGNIN_STREAK + p.id) ?? 0) >=
+      MILESTONE.SIGNIN_DAYS[2],
+    progress: (p) =>
+      Math.min(
+        1,
+        (world.getDynamicProperty(PLAYER_SIGNIN_STREAK + p.id) ?? 0) /
+          MILESTONE.SIGNIN_DAYS[2]
+      ),
+  },
+  // --- 放置方块系列 ---
+  {
+    id: "place1",
+    name: "建筑达人",
+    color: TIER_COLORS[0],
+    series: "placed",
+    tier: 1,
+    desc: `累计放置方块达到 ${fmt(MILESTONE.PLACE_COUNT[0])} 个`,
+    owned: (p) => getStat(p.id, STATS_PLACED_PREFIX) >= MILESTONE.PLACE_COUNT[0],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_PLACED_PREFIX) / MILESTONE.PLACE_COUNT[0]),
+  },
+  {
+    id: "place2",
     name: "建筑大师",
-    color: "§e",
-    desc: `累计放置方块达到 ${MILESTONE.PLACE_COUNT} 个`,
-    owned: (p) => getStat(p.id, STATS_PLACED_PREFIX) >= MILESTONE.PLACE_COUNT,
+    color: TIER_COLORS[1],
+    series: "placed",
+    tier: 2,
+    desc: `累计放置方块达到 ${fmt(MILESTONE.PLACE_COUNT[1])} 个`,
+    owned: (p) => getStat(p.id, STATS_PLACED_PREFIX) >= MILESTONE.PLACE_COUNT[1],
     progress: (p) =>
-      Math.min(1, getStat(p.id, STATS_PLACED_PREFIX) / MILESTONE.PLACE_COUNT),
+      Math.min(1, getStat(p.id, STATS_PLACED_PREFIX) / MILESTONE.PLACE_COUNT[1]),
   },
   {
-    id: "miner",
+    id: "place3",
+    name: "基建狂魔",
+    color: TIER_COLORS[2],
+    series: "placed",
+    tier: 3,
+    desc: `累计放置方块达到 ${fmt(MILESTONE.PLACE_COUNT[2])} 个`,
+    owned: (p) => getStat(p.id, STATS_PLACED_PREFIX) >= MILESTONE.PLACE_COUNT[2],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_PLACED_PREFIX) / MILESTONE.PLACE_COUNT[2]),
+  },
+  // --- 挖掘方块系列 ---
+  {
+    id: "mine1",
     name: "挖掘机",
-    color: "§7",
-    desc: `累计挖掘方块达到 ${MILESTONE.MINE_COUNT} 个`,
-    owned: (p) => getStat(p.id, STATS_MINED_PREFIX) >= MILESTONE.MINE_COUNT,
+    color: TIER_COLORS[0],
+    series: "mined",
+    tier: 1,
+    desc: `累计挖掘方块达到 ${fmt(MILESTONE.MINE_COUNT[0])} 个`,
+    owned: (p) => getStat(p.id, STATS_MINED_PREFIX) >= MILESTONE.MINE_COUNT[0],
     progress: (p) =>
-      Math.min(1, getStat(p.id, STATS_MINED_PREFIX) / MILESTONE.MINE_COUNT),
+      Math.min(1, getStat(p.id, STATS_MINED_PREFIX) / MILESTONE.MINE_COUNT[0]),
   },
   {
-    id: "hunter",
+    id: "mine2",
+    name: "肝王",
+    color: TIER_COLORS[1],
+    series: "mined",
+    tier: 2,
+    desc: `累计挖掘方块达到 ${fmt(MILESTONE.MINE_COUNT[1])} 个`,
+    owned: (p) => getStat(p.id, STATS_MINED_PREFIX) >= MILESTONE.MINE_COUNT[1],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_MINED_PREFIX) / MILESTONE.MINE_COUNT[1]),
+  },
+  {
+    id: "mine3",
+    name: "肝帝",
+    color: TIER_COLORS[2],
+    series: "mined",
+    tier: 3,
+    desc: `累计挖掘方块达到 ${fmt(MILESTONE.MINE_COUNT[2])} 个`,
+    owned: (p) => getStat(p.id, STATS_MINED_PREFIX) >= MILESTONE.MINE_COUNT[2],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_MINED_PREFIX) / MILESTONE.MINE_COUNT[2]),
+  },
+  // --- 击杀系列 ---
+  {
+    id: "kill1",
     name: "怪物猎人",
-    color: "§c",
-    desc: `累计击杀达到 ${MILESTONE.KILL_COUNT} 次`,
-    owned: (p) => getStat(p.id, STATS_KILLS_PREFIX) >= MILESTONE.KILL_COUNT,
+    color: TIER_COLORS[0],
+    series: "kills",
+    tier: 1,
+    desc: `累计击杀达到 ${fmt(MILESTONE.KILL_COUNT[0])} 次`,
+    owned: (p) => getStat(p.id, STATS_KILLS_PREFIX) >= MILESTONE.KILL_COUNT[0],
     progress: (p) =>
-      Math.min(1, getStat(p.id, STATS_KILLS_PREFIX) / MILESTONE.KILL_COUNT),
+      Math.min(1, getStat(p.id, STATS_KILLS_PREFIX) / MILESTONE.KILL_COUNT[0]),
   },
   {
-    id: "phoenix",
+    id: "kill2",
+    name: "怪物公敌",
+    color: TIER_COLORS[1],
+    series: "kills",
+    tier: 2,
+    desc: `累计击杀达到 ${fmt(MILESTONE.KILL_COUNT[1])} 次`,
+    owned: (p) => getStat(p.id, STATS_KILLS_PREFIX) >= MILESTONE.KILL_COUNT[1],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_KILLS_PREFIX) / MILESTONE.KILL_COUNT[1]),
+  },
+  {
+    id: "kill3",
+    name: "猎魔人",
+    color: TIER_COLORS[2],
+    series: "kills",
+    tier: 3,
+    desc: `累计击杀达到 ${fmt(MILESTONE.KILL_COUNT[2])} 次`,
+    owned: (p) => getStat(p.id, STATS_KILLS_PREFIX) >= MILESTONE.KILL_COUNT[2],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_KILLS_PREFIX) / MILESTONE.KILL_COUNT[2]),
+  },
+  // --- 死亡系列 ---
+  {
+    id: "death1",
+    name: "试试就逝世",
+    color: TIER_COLORS[0],
+    series: "deaths",
+    tier: 1,
+    desc: `累计死亡达到 ${fmt(MILESTONE.DEATH_COUNT[0])} 次`,
+    owned: (p) => getStat(p.id, STATS_DEATHS_PREFIX) >= MILESTONE.DEATH_COUNT[0],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_DEATHS_PREFIX) / MILESTONE.DEATH_COUNT[0]),
+  },
+  {
+    id: "death2",
+    name: "影逝二度",
+    color: TIER_COLORS[1],
+    series: "deaths",
+    tier: 2,
+    desc: `累计死亡达到 ${fmt(MILESTONE.DEATH_COUNT[1])} 次`,
+    owned: (p) => getStat(p.id, STATS_DEATHS_PREFIX) >= MILESTONE.DEATH_COUNT[1],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_DEATHS_PREFIX) / MILESTONE.DEATH_COUNT[1]),
+  },
+  {
+    id: "death3",
     name: "菜月昴",
-    color: "§d",
-    desc: `累计死亡达到 ${MILESTONE.DEATH_COUNT} 次（致敬）`,
-    owned: (p) => getStat(p.id, STATS_DEATHS_PREFIX) >= MILESTONE.DEATH_COUNT,
+    color: TIER_COLORS[2],
+    series: "deaths",
+    tier: 3,
+    desc: `累计死亡达到 ${fmt(MILESTONE.DEATH_COUNT[2])} 次`,
+    owned: (p) => getStat(p.id, STATS_DEATHS_PREFIX) >= MILESTONE.DEATH_COUNT[2],
     progress: (p) =>
-      Math.min(1, getStat(p.id, STATS_DEATHS_PREFIX) / MILESTONE.DEATH_COUNT),
+      Math.min(1, getStat(p.id, STATS_DEATHS_PREFIX) / MILESTONE.DEATH_COUNT[2]),
   },
+  // --- 持有金币系列 ---
   {
-    id: "rich",
+    id: "rich1",
     name: "百万富翁",
-    color: "§6",
+    color: TIER_COLORS[0],
     series: "money",
     tier: 1,
-    desc: `持有金币达到 ${MILESTONE.MONEY.toLocaleString("zh-CN")} 金币`,
-    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY,
-    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY),
+    desc: `持有金币达到 ${fmt(MILESTONE.MONEY[0])} 金币`,
+    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY[0],
+    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY[0]),
   },
   {
     id: "rich2",
     name: "千万富翁",
-    color: "§e",
+    color: TIER_COLORS[1],
     series: "money",
     tier: 2,
-    desc: `持有金币达到 ${MILESTONE.MONEY_TEN.toLocaleString("zh-CN")} 金币`,
-    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY_TEN,
-    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY_TEN),
+    desc: `持有金币达到 ${fmt(MILESTONE.MONEY[1])} 金币`,
+    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY[1],
+    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY[1]),
   },
   {
     id: "rich3",
     name: "亿万富翁",
-    color: "§5",
+    color: TIER_COLORS[2],
     series: "money",
     tier: 3,
-    desc: `持有金币达到 ${MILESTONE.MONEY_HUNDRED.toLocaleString("zh-CN")} 金币`,
-    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY_HUNDRED,
-    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY_HUNDRED),
+    desc: `持有金币达到 ${fmt(MILESTONE.MONEY[2])} 金币`,
+    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY[2],
+    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY[2]),
+  },
+  // --- 卖货系列（单日卖断物品数，历史最高） ---
+  {
+    id: "sell1",
+    name: "清仓甩卖",
+    color: TIER_COLORS[0],
+    series: "sell",
+    tier: 1,
+    desc: `单日内卖断 ${MILESTONE.SELL_COUNT[0]} 件物品（单件卖至 ${fmt(RECYCLE_DAILY_CAP)} 金币上限）`,
+    owned: (p) => sellBestCount(p) >= MILESTONE.SELL_COUNT[0],
+    progress: (p) => Math.min(1, sellBestCount(p) / MILESTONE.SELL_COUNT[0]),
   },
   {
-    id: "tycoon",
-    name: "垄断者",
-    color: "§b",
-    desc: `将单件物品卖至 ${RECYCLE_DAILY_CAP.toLocaleString("zh-CN")} 金币上限`,
-    owned: (p) => world.getDynamicProperty(RECYCLE_CAP_FLAG_PREFIX + p.id) === true,
-    progress: (p) =>
-      world.getDynamicProperty(RECYCLE_CAP_FLAG_PREFIX + p.id) === true ? 1 : 0,
+    id: "sell2",
+    name: "市场倾销",
+    color: TIER_COLORS[1],
+    series: "sell",
+    tier: 2,
+    desc: `单日内卖断 ${MILESTONE.SELL_COUNT[1]} 件物品`,
+    owned: (p) => sellBestCount(p) >= MILESTONE.SELL_COUNT[1],
+    progress: (p) => Math.min(1, sellBestCount(p) / MILESTONE.SELL_COUNT[1]),
   },
   {
-    id: "lucky",
+    id: "sell3",
+    name: "人形印钞机",
+    color: TIER_COLORS[2],
+    series: "sell",
+    tier: 3,
+    desc: `单日内卖断 ${MILESTONE.SELL_COUNT[2]} 件物品`,
+    owned: (p) => sellBestCount(p) >= MILESTONE.SELL_COUNT[2],
+    progress: (p) => Math.min(1, sellBestCount(p) / MILESTONE.SELL_COUNT[2]),
+  },
+  // --- 抽奖系列 ---
+  {
+    id: "lot1",
     name: "赌徒",
-    color: "§5",
-    desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT} 次`,
-    owned: (p) => getStat(p.id, STATS_LOTTERY_PREFIX) >= MILESTONE.LOTTERY_COUNT,
+    color: TIER_COLORS[0],
+    series: "lottery",
+    tier: 1,
+    desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT[0]} 次`,
+    owned: (p) => getStat(p.id, STATS_LOTTERY_PREFIX) >= MILESTONE.LOTTERY_COUNT[0],
     progress: (p) =>
-      Math.min(1, getStat(p.id, STATS_LOTTERY_PREFIX) / MILESTONE.LOTTERY_COUNT),
+      Math.min(1, getStat(p.id, STATS_LOTTERY_PREFIX) / MILESTONE.LOTTERY_COUNT[0]),
   },
   {
-    id: "achiever",
+    id: "lot2",
+    name: "赌神",
+    color: TIER_COLORS[1],
+    series: "lottery",
+    tier: 2,
+    desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT[1]} 次`,
+    owned: (p) => getStat(p.id, STATS_LOTTERY_PREFIX) >= MILESTONE.LOTTERY_COUNT[1],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_LOTTERY_PREFIX) / MILESTONE.LOTTERY_COUNT[1]),
+  },
+  {
+    id: "lot3",
+    name: "狂赌之渊",
+    color: TIER_COLORS[2],
+    series: "lottery",
+    tier: 3,
+    desc: `累计抽奖达到 ${MILESTONE.LOTTERY_COUNT[2]} 次`,
+    owned: (p) => getStat(p.id, STATS_LOTTERY_PREFIX) >= MILESTONE.LOTTERY_COUNT[2],
+    progress: (p) =>
+      Math.min(1, getStat(p.id, STATS_LOTTERY_PREFIX) / MILESTONE.LOTTERY_COUNT[2]),
+  },
+  // --- 成就系列 ---
+  {
+    id: "ach1",
     name: "成就猎人",
-    color: "§2",
-    desc: `解锁 ${MILESTONE.ACHIEVE_COUNT} 个成就`,
-    owned: (p) => getAchievements(p.id).length >= MILESTONE.ACHIEVE_COUNT,
+    color: TIER_COLORS[0],
+    series: "achieve",
+    tier: 1,
+    desc: `解锁 ${MILESTONE.ACHIEVE_COUNT[0]} 个成就`,
+    owned: (p) => getAchievements(p.id).length >= MILESTONE.ACHIEVE_COUNT[0],
     progress: (p) =>
-      Math.min(1, getAchievements(p.id).length / MILESTONE.ACHIEVE_COUNT),
+      Math.min(1, getAchievements(p.id).length / MILESTONE.ACHIEVE_COUNT[0]),
   },
   {
-    id: "talent_master",
-    name: "天赋哥",
-    color: "§3",
-    desc: `任意天赋达到 ${MILESTONE.TALENT_LEVEL} 级`,
-    owned: (p) =>
-      ["speed", "haste", "strength", "jump", "resistance", "health"].some(
-        (tid) => getTalentLevel(p.id, tid) >= MILESTONE.TALENT_LEVEL
-      ),
-    progress: (p) => {
-      const maxLv = Math.max(
-        ...["speed", "haste", "strength", "jump", "resistance", "health"].map(
-          (tid) => getTalentLevel(p.id, tid)
-        )
-      );
-      return Math.min(1, maxLv / MILESTONE.TALENT_LEVEL);
-    },
+    id: "ach2",
+    name: "黄金玩家",
+    color: TIER_COLORS[1],
+    series: "achieve",
+    tier: 2,
+    desc: `解锁 ${MILESTONE.ACHIEVE_COUNT[1]} 个成就`,
+    owned: (p) => getAchievements(p.id).length >= MILESTONE.ACHIEVE_COUNT[1],
+    progress: (p) =>
+      Math.min(1, getAchievements(p.id).length / MILESTONE.ACHIEVE_COUNT[1]),
+  },
+  {
+    id: "ach3",
+    name: "白金玩家",
+    color: TIER_COLORS[2],
+    series: "achieve",
+    tier: 3,
+    desc: `解锁 ${MILESTONE.ACHIEVE_COUNT[2]} 个成就（当前成就共 66 个，需后续新增成就）`,
+    owned: (p) => getAchievements(p.id).length >= MILESTONE.ACHIEVE_COUNT[2],
+    progress: (p) =>
+      Math.min(1, getAchievements(p.id).length / MILESTONE.ACHIEVE_COUNT[2]),
+  },
+  // --- 天赋系列 ---
+  {
+    id: "tal1",
+    name: "略有小成",
+    color: TIER_COLORS[0],
+    series: "talent",
+    tier: 1,
+    desc: `任意天赋达到 ${MILESTONE.TALENT_LEVEL[0]} 级`,
+    owned: (p) => hasAnyTalentLevel(p, MILESTONE.TALENT_LEVEL[0]),
+    progress: (p) => Math.min(1, maxTalentLevel(p) / MILESTONE.TALENT_LEVEL[0]),
+  },
+  {
+    id: "tal2",
+    name: "登峰造极",
+    color: TIER_COLORS[1],
+    series: "talent",
+    tier: 2,
+    desc: `任意天赋达到 ${MILESTONE.TALENT_LEVEL[1]} 级`,
+    owned: (p) => hasAnyTalentLevel(p, MILESTONE.TALENT_LEVEL[1]),
+    progress: (p) => Math.min(1, maxTalentLevel(p) / MILESTONE.TALENT_LEVEL[1]),
+  },
+  {
+    id: "tal3",
+    name: "六边形战士",
+    color: TIER_COLORS[2],
+    series: "talent",
+    tier: 3,
+    desc: `所有天赋均达到 ${MILESTONE.TALENT_LEVEL[1]} 级`,
+    owned: (p) => hasAllTalentLevel(p, MILESTONE.TALENT_LEVEL[1]),
+    progress: (p) => Math.min(1, maxTalentLevel(p) / MILESTONE.TALENT_LEVEL[1]),
   },
 ];
 
