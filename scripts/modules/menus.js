@@ -54,6 +54,7 @@ function showIslandMenu(player) {
     f.close();
     handleSpawn(player);
   });
+  f = f.spacer();
   f = f.button("岛屿", () => {
     f.close();
     system.runTimeout(
@@ -61,42 +62,56 @@ function showIslandMenu(player) {
       2
     );
   });
-  f = f.button("成就列表", () => {
+  f = f.button("成长", () => {
     f.close();
-    system.runTimeout(() => showAchievementsMenu(player), 2);
+    system.runTimeout(() => showGrowthMenu(player), 2);
   });
-  f = f.button("称号", () => {
-    f.close();
-    system.runTimeout(() => showTitleMenu(player, showIslandMenu), 2);
-  });
-  f = f.button("排行榜", () => {
-    f.close();
-    system.runTimeout(
-      () => showLeaderboardMenu(player, showIslandMenu),
-      2
-    );
-  });
-  f = f.button("天赋", () => {
-    f.close();
-    system.runTimeout(
-      () => showTalentMenu(player, showIslandMenu),
-      2
-    );
-  });
-  f = f.button("辅助功能", () => {
-    f.close();
-    system.runTimeout(
-      () => showAssistantMenu(player, showIslandMenu),
-      2
-    );
-  });
-  f = f.button("交易", () => {
+  f = f.button("经济", () => {
     f.close();
     system.runTimeout(() => showTradeSubMenu(player), 2);
   });
   f = f.button("抽奖", () => {
     f.close();
     system.runTimeout(() => showLotteryMenu(player, showIslandMenu), 2);
+  });
+  f = f.button("设置", () => {
+    f.close();
+    system.runTimeout(
+      () => showAssistantMenu(player, showIslandMenu),
+      2
+    );
+  });
+  f.show().catch((e) => console.warn("Form show failed:", e));
+}
+
+// ============================================================
+// 成长二级菜单
+// ============================================================
+
+function showGrowthMenu(player) {
+  let f = new CustomForm(player, "成长");
+  f = f.label("§7成就 / 称号 / 天赋 / 排行榜");
+  f = f.spacer();
+  f = f.button("成就列表", () => {
+    f.close();
+    system.runTimeout(() => showAchievementsMenu(player, showGrowthMenu), 2);
+  });
+  f = f.button("称号", () => {
+    f.close();
+    system.runTimeout(() => showTitleMenu(player, showGrowthMenu), 2);
+  });
+  f = f.button("天赋", () => {
+    f.close();
+    system.runTimeout(() => showTalentMenu(player, showGrowthMenu), 2);
+  });
+  f = f.button("排行榜", () => {
+    f.close();
+    system.runTimeout(() => showLeaderboardMenu(player, showGrowthMenu), 2);
+  });
+  f = f.spacer();
+  f = f.button("返回", () => {
+    f.close();
+    system.runTimeout(() => showIslandMenu(player), 2);
   });
   f.show().catch((e) => console.warn("Form show failed:", e));
 }
@@ -105,7 +120,7 @@ function showIslandMenu(player) {
 // 成就列表
 // ============================================================
 
-function showAchievementsMenu(player) {
+function showAchievementsMenu(player, backFn) {
   const completed = getAchievements(player.id);
   const unlockedCount = completed.length;
   const totalCount = ACHIEVEMENTS.length;
@@ -125,9 +140,9 @@ function showAchievementsMenu(player) {
 
   form
     .spacer()
-    .button("返回主菜单", () => {
+    .button("返回", () => {
       form.close();
-      system.runTimeout(() => showIslandMenu(player), 2);
+      system.runTimeout(() => backFn(player), 2);
     });
 
   form.show().catch((e) => console.warn("Form show failed:", e));
@@ -142,7 +157,7 @@ function showTradeSubMenu(player) {
   const marketUnlocked = world.getDynamicProperty(
     MARKET_UNLOCKED_PREFIX + player.id
   );
-  let f = new CustomForm(player, "交易");
+  let f = new CustomForm(player, "经济");
   f = f.label(`§6当前金币: ${money}`);
   f = f.spacer();
   f = f.button("转账", () => {
