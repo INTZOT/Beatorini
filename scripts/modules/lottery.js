@@ -11,9 +11,10 @@ import { addStat } from "./stats.js";
 import { STATS_LOTTERY_PREFIX } from "./config.js";
 
 // --- 稀有度配置 ---
-const RARITY_ORDER = ["common", "rare", "epic", "legendary"];
+const RARITY_ORDER = ["common", "uncommon", "rare", "epic", "legendary"];
 const RARITY = {
   common: { label: "普通", color: "§7", weight: 740 },
+  uncommon: { label: "少见", color: "§e", weight: 740 },
   rare: { label: "稀有", color: "§9", weight: 249 },
   epic: { label: "史诗", color: "§d", weight: 10 },
   legendary: { label: "传说", color: "§6", weight: 1 },
@@ -159,6 +160,113 @@ const END_REWARDS = [
   ["minecraft:dragon_egg", "龙蛋", "legendary", 1],
 ];
 
+// --- 宝藏奖池内容（基岩版少见及以上稀有度物品） ---
+// [物品 ID, 中文名, 稀有度, 单次数量]
+const TREASURE_REWARDS = [
+  // --- 少见（Uncommon） ---
+  ["minecraft:creeper_banner_pattern", "苦力怕盾徽旗帜图案", "uncommon", 1],
+  ["minecraft:piglin_banner_pattern", "猪鼻旗帜图案", "uncommon", 1],
+  ["minecraft:book", "书", "uncommon", 1],
+  ["minecraft:sniffer_egg", "嗅探兽蛋", "uncommon", 1],
+  ["minecraft:chainmail_helmet", "锁链头盔", "uncommon", 1],
+  ["minecraft:chainmail_chestplate", "锁链胸甲", "uncommon", 1],
+  ["minecraft:chainmail_leggings", "锁链护腿", "uncommon", 1],
+  ["minecraft:chainmail_boots", "锁链靴子", "uncommon", 1],
+  ["minecraft:recovery_compass", "追溯指针", "uncommon", 1],
+  ["minecraft:disc_fragment_5", "唱片残片5", "uncommon", 1],
+  ["minecraft:nautilus_shell", "鹦鹉螺壳", "uncommon", 1],
+  ["minecraft:echo_shard", "回响碎片", "uncommon", 1],
+  ["minecraft:goat_horn", "山羊角", "uncommon", 1],
+  ["minecraft:angler_pottery_sherd", "垂钓纹陶片", "uncommon", 1],
+  ["minecraft:blade_pottery_sherd", "利刃纹陶片", "uncommon", 1],
+  ["minecraft:brewer_pottery_sherd", "佳酿纹陶片", "uncommon", 1],
+  ["minecraft:burn_pottery_sherd", "烈焰纹陶片", "uncommon", 1],
+  ["minecraft:danger_pottery_sherd", "危险纹陶片", "uncommon", 1],
+  ["minecraft:explorer_pottery_sherd", "探险纹陶片", "uncommon", 1],
+  ["minecraft:friend_pottery_sherd", "挚友纹陶片", "uncommon", 1],
+  ["minecraft:heart_pottery_sherd", "爱心纹陶片", "uncommon", 1],
+  ["minecraft:heartbreak_pottery_sherd", "心碎纹陶片", "uncommon", 1],
+  ["minecraft:howl_pottery_sherd", "嚎叫纹陶片", "uncommon", 1],
+  ["minecraft:miner_pottery_sherd", "矿工纹陶片", "uncommon", 1],
+  ["minecraft:mourner_pottery_sherd", "哀悼纹陶片", "uncommon", 1],
+  ["minecraft:plenty_pottery_sherd", "丰收纹陶片", "uncommon", 1],
+  ["minecraft:prize_pottery_sherd", "珍宝纹陶片", "uncommon", 1],
+  ["minecraft:sheaf_pottery_sherd", "麦捆纹陶片", "uncommon", 1],
+  ["minecraft:shelter_pottery_sherd", "庇护纹陶片", "uncommon", 1],
+  ["minecraft:skull_pottery_sherd", "骷髅纹陶片", "uncommon", 1],
+  ["minecraft:snort_pottery_sherd", "鼻息纹陶片", "uncommon", 1],
+  ["minecraft:flow_pottery_sherd", "涡流纹陶片", "uncommon", 1],
+  ["minecraft:guster_pottery_sherd", "旋风纹陶片", "uncommon", 1],
+  ["minecraft:ominous_bottle", "不祥之瓶", "uncommon", 1],
+  ["minecraft:netherite_upgrade_smithing_template", "下界合金升级模板", "uncommon", 1],
+  ["minecraft:sentry_armor_trim_smithing_template", "哨兵纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:dune_armor_trim_smithing_template", "沙丘纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:coast_armor_trim_smithing_template", "海岸纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:wild_armor_trim_smithing_template", "荒野纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:tide_armor_trim_smithing_template", "潮汐纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:snout_armor_trim_smithing_template", "猪鼻纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:rib_armor_trim_smithing_template", "肋骨纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:wayfinder_armor_trim_smithing_template", "寻路者纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:shaper_armor_trim_smithing_template", "塑造者纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:raiser_armor_trim_smithing_template", "牧民纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:host_armor_trim_smithing_template", "雇主纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:flow_armor_trim_smithing_template", "涡流纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:bolt_armor_trim_smithing_template", "旋涡纹盔甲纹饰", "uncommon", 1],
+  ["minecraft:music_disc_13", "唱片 13", "uncommon", 1],
+  ["minecraft:music_disc_cat", "唱片 cat", "uncommon", 1],
+  ["minecraft:music_disc_blocks", "唱片 blocks", "uncommon", 1],
+  ["minecraft:music_disc_chirp", "唱片 chirp", "uncommon", 1],
+  ["minecraft:music_disc_far", "唱片 far", "uncommon", 1],
+  ["minecraft:music_disc_mall", "唱片 mall", "uncommon", 1],
+  ["minecraft:music_disc_mellohi", "唱片 mellohi", "uncommon", 1],
+  ["minecraft:music_disc_stal", "唱片 stal", "uncommon", 1],
+  ["minecraft:music_disc_strad", "唱片 strad", "uncommon", 1],
+  ["minecraft:music_disc_ward", "唱片 ward", "uncommon", 1],
+  ["minecraft:music_disc_11", "唱片 11", "uncommon", 1],
+  ["minecraft:music_disc_wait", "唱片 wait", "uncommon", 1],
+  ["minecraft:music_disc_5", "唱片 5", "uncommon", 1],
+  ["minecraft:music_disc_relic", "唱片 Relic", "uncommon", 1],
+  ["minecraft:music_disc_creator_music_box", "唱片 Creator（音乐盒）", "uncommon", 1],
+  ["minecraft:music_disc_precipice", "唱片 Precipice", "uncommon", 1],
+  ["minecraft:music_disc_tears", "唱片 Tears", "uncommon", 1],
+  ["minecraft:music_disc_lava_chicken", "唱片 Lava Chicken", "uncommon", 1],
+  ["minecraft:music_disc_bounce", "唱片 Bounce", "uncommon", 1],
+  ["minecraft:totem_of_undying", "不死图腾", "uncommon", 1],
+  ["minecraft:experience_bottle", "附魔之瓶", "uncommon", 1],
+  ["minecraft:conduit", "潮涌核心", "uncommon", 1],
+  ["minecraft:heart_of_the_sea", "海洋之心", "uncommon", 1],
+  ["minecraft:dragon_breath", "龙息", "uncommon", 1],
+  ["minecraft:player_head", "玩家头颅", "uncommon", 1],
+  ["minecraft:zombie_head", "僵尸头颅", "uncommon", 1],
+  ["minecraft:creeper_head", "苦力怕头颅", "uncommon", 1],
+  ["minecraft:skeleton_skull", "骷髅头颅", "uncommon", 1],
+  ["minecraft:piglin_head", "猪灵头颅", "uncommon", 1],
+  // --- 稀有（Rare） ---
+  ["minecraft:flow_banner_pattern", "涡流旗帜图案", "rare", 1],
+  ["minecraft:guster_banner_pattern", "旋风旗帜图案", "rare", 1],
+  ["minecraft:enchanted_golden_apple", "附魔金苹果", "rare", 1],
+  ["minecraft:trident", "三叉戟", "rare", 1],
+  ["minecraft:nether_star", "下界之星", "rare", 1],
+  ["minecraft:ward_armor_trim_smithing_template", "监守纹盔甲纹饰", "rare", 1],
+  ["minecraft:eye_armor_trim_smithing_template", "眼眸纹盔甲纹饰", "rare", 1],
+  ["minecraft:vex_armor_trim_smithing_template", "恼鬼纹盔甲纹饰", "rare", 1],
+  ["minecraft:spire_armor_trim_smithing_template", "尖塔纹盔甲纹饰", "rare", 1],
+  ["minecraft:wither_skeleton_skull", "凋灵骷髅头颅", "rare", 1],
+  ["minecraft:music_disc_pigstep", "唱片 Pigstep", "rare", 1],
+  ["minecraft:music_disc_otherside", "唱片 otherside", "rare", 1],
+  ["minecraft:music_disc_creator", "唱片 Creator", "rare", 1],
+  ["minecraft:beacon", "信标", "rare", 1],
+  ["minecraft:skull_banner_pattern", "头颅盾徽旗帜图案", "rare", 1],
+  ["minecraft:mojang_banner_pattern", "Mojang徽标旗帜图案", "rare", 1],
+  // --- 史诗（Epic） ---
+  ["minecraft:elytra", "鞘翅", "epic", 1],
+  ["minecraft:dragon_head", "龙首", "epic", 1],
+  ["minecraft:dragon_egg", "龙蛋", "epic", 1],
+  ["minecraft:silence_armor_trim_smithing_template", "幽静纹盔甲纹饰", "epic", 1],
+  ["minecraft:heavy_core", "沉重核心", "epic", 1],
+  ["minecraft:mace", "重锤", "epic", 1],
+];
+
 // --- 奖池列表（后续新增奖池直接在此追加） ---
 const LOTTERY_POOLS = [
   {
@@ -194,6 +302,19 @@ const LOTTERY_POOLS = [
     description: `内含 ${END_REWARDS.length} 种末地物资，从黑曜石到鞘翅龙蛋！`,
     singleCost: 100000,
     rewards: END_REWARDS.map(([typeId, label, rarity, count = 1]) => ({
+      typeId,
+      label,
+      rarity,
+      count,
+    })),
+  },
+  {
+    id: "treasure",
+    name: "宝藏奖池",
+    icon: "❖",
+    description: `内含 ${TREASURE_REWARDS.length} 种少见及以上稀有度物品，从唱片陶片到鞘翅重锤！`,
+    singleCost: 100000,
+    rewards: TREASURE_REWARDS.map(([typeId, label, rarity, count = 1]) => ({
       typeId,
       label,
       rarity,
@@ -254,6 +375,7 @@ function playRaritySound(player, rarity) {
   const sound =
     {
       common: "random.pop",
+      uncommon: "random.pop",
       rare: "random.orb",
       epic: "random.levelup",
       legendary: "firework.large_blast",
@@ -310,15 +432,17 @@ function getPityInfo(player, poolId) {
  */
 function drawOneWithPity(player, pool) {
   addStat(player.id, STATS_LOTTERY_PREFIX, 1);
+  const hasEpic = pool.rewards.some((r) => r.rarity === "epic");
+  const hasLegendary = pool.rewards.some((r) => r.rarity === "legendary");
   let epicPity = getPity(player, pool.id, LOTTERY_PITY_EPIC_PREFIX);
   let legendaryPity = getPity(player, pool.id, LOTTERY_PITY_LEGENDARY_PREFIX);
   let reward;
   let pityType = null;
 
-  if (legendaryPity >= PITY_LEGENDARY_THRESHOLD - 1) {
+  if (hasLegendary && legendaryPity >= PITY_LEGENDARY_THRESHOLD - 1) {
     reward = pickReward(pool, getRarityIndex("legendary"));
     pityType = "legendary";
-  } else if (epicPity >= PITY_EPIC_THRESHOLD - 1) {
+  } else if (hasEpic && epicPity >= PITY_EPIC_THRESHOLD - 1) {
     reward = pickReward(pool, getRarityIndex("epic"));
     pityType = "epic";
   } else {
@@ -331,10 +455,10 @@ function drawOneWithPity(player, pool) {
     epicPity = 0;
   } else if (reward.rarity === "epic") {
     epicPity = 0;
-    legendaryPity += 1;
+    if (hasLegendary) legendaryPity += 1;
   } else {
-    epicPity += 1;
-    legendaryPity += 1;
+    if (hasEpic) epicPity += 1;
+    if (hasLegendary) legendaryPity += 1;
   }
 
   setPity(player, pool.id, LOTTERY_PITY_EPIC_PREFIX, epicPity);
@@ -449,15 +573,22 @@ function showDrawResultForm(player, pool, results, dropped, isTen, backFn) {
 function showPoolMenu(player, pool, backFn) {
   const tenCost = pool.singleCost * TEN_PULL_COUNT;
   const pity = getPityInfo(player, pool.id);
+  const pityTexts = [];
+  if (pool.rewards.some((r) => r.rarity === "epic")) {
+    pityTexts.push(`史诗保底: ${pity.epic}/${PITY_EPIC_THRESHOLD}`);
+  }
+  if (pool.rewards.some((r) => r.rarity === "legendary")) {
+    pityTexts.push(`传说保底: ${pity.legendary}/${PITY_LEGENDARY_THRESHOLD}`);
+  }
   let f = new CustomForm(player, `${pool.icon} ${pool.name}`);
   f = f.label(`§6当前金币: ${formatNumber(getPlayerMoney(player))}`);
   f = f.spacer();
   f = f.label(pool.description);
   f = f.spacer();
-  f = f.label(
-    `§7史诗保底: ${pity.epic}/${PITY_EPIC_THRESHOLD}  传说保底: ${pity.legendary}/${PITY_LEGENDARY_THRESHOLD}`
-  );
-  f = f.spacer();
+  if (pityTexts.length > 0) {
+    f = f.label(`§7${pityTexts.join("   ")}`);
+    f = f.spacer();
+  }
   f = f.button(`单抽一次  ${formatNumber(pool.singleCost)}`, () => {
     f.close();
     system.runTimeout(() => drawOnce(player, pool, backFn), 2);
