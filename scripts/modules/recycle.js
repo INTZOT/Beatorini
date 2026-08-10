@@ -5,8 +5,6 @@ import { getPlayerMoney } from "./money.js";
 import {
   RECYCLE_DAILY_CAP,
   RECYCLE_CUM_PREFIX,
-  RECYCLE_CAP_DAY_PREFIX,
-  RECYCLE_CAP_BEST_PREFIX,
 } from "./config.js";
 
 // --- 回收物品分类 ---
@@ -136,32 +134,6 @@ function addRecycleCum(player, typeId, amount) {
       data = { date: today, gold: {} };
     }
     data.gold[typeId] = (data.gold[typeId] ?? 0) + amount;
-    if (data.gold[typeId] >= RECYCLE_DAILY_CAP) {
-      // 卖断：记录当日卖断物品集合与历史单日最高卖断数（卖货系列称号）
-      const dayRaw = world.getDynamicProperty(
-        RECYCLE_CAP_DAY_PREFIX + player.id
-      );
-      let dayData = null;
-      if (dayRaw && typeof dayRaw === "string") {
-        try {
-          dayData = JSON.parse(dayRaw);
-        } catch (e) {}
-      }
-      if (!dayData || dayData.date !== getTodayStr()) {
-        dayData = { date: getTodayStr(), items: [] };
-      }
-      if (!dayData.items.includes(typeId)) dayData.items.push(typeId);
-      world.setDynamicProperty(
-        RECYCLE_CAP_DAY_PREFIX + player.id,
-        JSON.stringify(dayData)
-      );
-      const count = dayData.items.length;
-      const best =
-        world.getDynamicProperty(RECYCLE_CAP_BEST_PREFIX + player.id) ?? 0;
-      if (count > best) {
-        world.setDynamicProperty(RECYCLE_CAP_BEST_PREFIX + player.id, count);
-      }
-    }
     world.setDynamicProperty(
       RECYCLE_CUM_PREFIX + player.id,
       JSON.stringify(data)

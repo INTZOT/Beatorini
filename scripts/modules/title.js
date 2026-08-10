@@ -10,8 +10,6 @@ import {
   STATS_DEATHS_PREFIX,
   STATS_LOTTERY_PREFIX,
   PLAYER_SIGNIN_STREAK,
-  RECYCLE_DAILY_CAP,
-  RECYCLE_CAP_BEST_PREFIX,
 } from "./config.js";
 import { getStat } from "./stats.js";
 import { getAchievements } from "./achievements.js";
@@ -27,7 +25,6 @@ const MILESTONE = {
   KILL_COUNT: [1000, 10000, 100000], // 累计击杀
   DEATH_COUNT: [100, 1000, 10000], // 累计死亡
   MONEY: [1000000, 10000000, 100000000], // 持有金币
-  SELL_COUNT: [1, 5, 10], // 单日卖断物品数
   LOTTERY_COUNT: [10, 100, 1000], // 累计抽奖次数
   ACHIEVE_COUNT: [10, 50, 100], // 解锁成就数（当前成就共 66 个，100 档暂不可达）
   TALENT_LEVEL: [60, 120], // 天赋等级（第三档要求全部满级）
@@ -46,10 +43,6 @@ function hasAllTalentLevel(player, level) {
 function maxTalentLevel(player) {
   return Math.max(...TALENT_IDS.map((id) => getTalentLevel(player.id, id)));
 }
-function sellBestCount(player) {
-  return world.getDynamicProperty(RECYCLE_CAP_BEST_PREFIX + player.id) ?? 0;
-}
-
 // --- 称号目录（系列 + 三档） ---
 // id: 存储标识；series: 系列；tier: 档位（1~3）
 // owned(player): 是否已解锁；progress(player): 0~1 进度（可选）
@@ -313,37 +306,6 @@ export const TITLES = [
     desc: `持有金币达到 ${fmt(MILESTONE.MONEY[2])} 金币`,
     owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY[2],
     progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY[2]),
-  },
-  // --- 卖货系列（单日卖断物品数，历史最高） ---
-  {
-    id: "sell1",
-    name: "清仓甩卖",
-    color: TIER_COLORS[0],
-    series: "sell",
-    tier: 1,
-    desc: `单日内卖断 ${MILESTONE.SELL_COUNT[0]} 件物品（单件卖至 ${fmt(RECYCLE_DAILY_CAP)} 金币上限）`,
-    owned: (p) => sellBestCount(p) >= MILESTONE.SELL_COUNT[0],
-    progress: (p) => Math.min(1, sellBestCount(p) / MILESTONE.SELL_COUNT[0]),
-  },
-  {
-    id: "sell2",
-    name: "市场倾销",
-    color: TIER_COLORS[1],
-    series: "sell",
-    tier: 2,
-    desc: `单日内卖断 ${MILESTONE.SELL_COUNT[1]} 件物品`,
-    owned: (p) => sellBestCount(p) >= MILESTONE.SELL_COUNT[1],
-    progress: (p) => Math.min(1, sellBestCount(p) / MILESTONE.SELL_COUNT[1]),
-  },
-  {
-    id: "sell3",
-    name: "人形印钞机",
-    color: TIER_COLORS[2],
-    series: "sell",
-    tier: 3,
-    desc: `单日内卖断 ${MILESTONE.SELL_COUNT[2]} 件物品`,
-    owned: (p) => sellBestCount(p) >= MILESTONE.SELL_COUNT[2],
-    progress: (p) => Math.min(1, sellBestCount(p) / MILESTONE.SELL_COUNT[2]),
   },
   // --- 抽奖系列 ---
   {
