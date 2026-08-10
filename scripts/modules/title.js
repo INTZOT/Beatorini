@@ -26,7 +26,9 @@ const MILESTONE = {
   MINE_COUNT: 10000, // 累计挖掘 10000 方块
   KILL_COUNT: 100, // 累计击杀 100
   DEATH_COUNT: 50, // 累计死亡 50（致敬）
-  MONEY: 1000000, // 持有金币 100 万
+  MONEY: 1000000, // 持有金币 100 万（百万富翁）
+  MONEY_TEN: 10000000, // 持有金币 1000 万（千万富翁）
+  MONEY_HUNDRED: 100000000, // 持有金币 1 亿（亿万富翁）
   ACHIEVE_COUNT: 30, // 解锁 30 个成就
   TALENT_LEVEL: 100, // 任意天赋 100 级
   LOTTERY_COUNT: 50, // 累计抽奖 50 次
@@ -107,9 +109,31 @@ export const TITLES = [
     id: "rich",
     name: "百万富翁",
     color: "§6",
+    series: "money",
+    tier: 1,
     desc: `持有金币达到 ${MILESTONE.MONEY.toLocaleString("zh-CN")} 金币`,
     owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY,
     progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY),
+  },
+  {
+    id: "rich2",
+    name: "千万富翁",
+    color: "§e",
+    series: "money",
+    tier: 2,
+    desc: `持有金币达到 ${MILESTONE.MONEY_TEN.toLocaleString("zh-CN")} 金币`,
+    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY_TEN,
+    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY_TEN),
+  },
+  {
+    id: "rich3",
+    name: "亿万富翁",
+    color: "§5",
+    series: "money",
+    tier: 3,
+    desc: `持有金币达到 ${MILESTONE.MONEY_HUNDRED.toLocaleString("zh-CN")} 金币`,
+    owned: (p) => getPlayerMoney(p) >= MILESTONE.MONEY_HUNDRED,
+    progress: (p) => Math.min(1, getPlayerMoney(p) / MILESTONE.MONEY_HUNDRED),
   },
   {
     id: "tycoon",
@@ -284,8 +308,29 @@ export function setWornTitle(playerId, titleId) {
 // ============================================================
 
 export function showTitleMenu(player, backFn) {
+  // 系列自动升档：若佩戴低档且已解锁更高档，先升档
+  const raw0 = world.getDynamicProperty(TITLE_PREFIX + player.id) || "";
+  const worn0 = TITLES.find((x) => x.id === raw0);
+  if (worn0?.series) {
+    const best = TITLES.filter(
+      (t) => t.series === worn0.series && t.owned(player)
+    ).reduce((a, b) => (b.tier > a.tier ? b : a), worn0);
+    if (best.id !== worn0.id) setWornTitle(player.id, best.id);
+  }
+
   const wornRaw = world.getDynamicProperty(TITLE_PREFIX + player.id) || "";
-  const ownedTitles = TITLES.filter((t) => t.owned(player));
+  const ownedAll = TITLES.filter((t) => t.owned(player));
+  // 同系列只保留已解锁的最高档
+  const ownedTitles = [];
+  for (const t of ownedAll) {
+    if (!t.series) {
+      ownedTitles.push(t);
+      continue;
+    }
+    const seriesOwned = ownedAll.filter((x) => x.series === t.series);
+    const best = seriesOwned.reduce((a, b) => (b.tier > a.tier ? b : a));
+    if (t.id === best.id) ownedTitles.push(t);
+  }
 
   const wornTitle = ownedTitles.find((x) => x.id === wornRaw);
   const wornText = wornTitle
@@ -345,7 +390,17 @@ export function init() {
     if (raw === undefined || !valid) {
       setWornTitle(player.id, "newbie");
     } else {
-      syncTitleShape(player);
+      const worn = TITLES.find((t) => t.id === raw);
+      if (worn?.series) {
+        // 系列自动升档
+        const best = TITLES.filter(
+          (t) => t.series === worn.series && t.owned(player)
+        ).reduce((a, b) => (b.tier > a.tier ? b : a), worn);
+        if (best.id !== worn.id) setWornTitle(player.id, best.id);
+        else syncTitleShape(player);
+      } else {
+        syncTitleShape(player);
+      }
     }
     refreshAllTitleShapes();
   });
