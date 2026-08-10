@@ -104,7 +104,7 @@ export function showTitleMenu(player, backFn) {
   const wornIndex = wornTitle
     ? TITLES.findIndex((t) => t.id === wornTitle.id)
     : NO_TITLE_INDEX;
-  const selected = new ObservableNumber(wornIndex);
+  const selected = new ObservableNumber(wornIndex, { clientWritable: true });
 
   const form = new CustomForm(player, "称号")
     .label(`§e当前称号: ${wornText}`)
