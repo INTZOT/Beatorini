@@ -29,7 +29,6 @@ import { showSigninForm } from "./signin.js";
 import { showAssistantMenu, getAssistSettings } from "./assistants.js";
 import { debugVault } from "./vault.js";
 import { showLotteryMenu } from "./lottery.js";
-import { showGoldTest } from "./goldtest.js";
 import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
 
 // ============================================================
@@ -425,15 +424,6 @@ export function init() {
         return;
       }
       debugVault(player);
-      return;
-    }
-    if (event.message === "#goldtest") {
-      event.cancel = true;
-      if (!player.hasTag("op")) {
-        player.sendMessage("§c你没有权限使用此命令！");
-        return;
-      }
-      system.runTimeout(() => showGoldTest(player), 1);
       return;
     }
     // 普通聊天消息添加称号前缀
