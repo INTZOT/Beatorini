@@ -55,7 +55,7 @@ export const ACHIEVEMENTS = [
   { item: "minecraft:shield", name: "【我的刀盾】", reward: 5000 },
   { item: "minecraft:brown_mushroom", name: "【蓝瘦香菇】", reward: 2000 },
   { item: "minecraft:chicken", name: "【你干嘛~哎呦】", reward: 2000 },
-  { item: "minecraft:redstone_repeater", name: "【雷石东直放站】", reward: 5000 },
+  { item: "minecraft:repeater", name: "【雷石东直放站】", reward: 5000 },
   { item: "minecraft:string", name: "【谁打出来的胶布！?】", reward: 2000 },
   { item: "minecraft:porkchop", name: "【群友谋杀事件】", reward: 2000 },
   { item: "minecraft:tnt", name: "【蹦蹦炸弹】", reward: 5000 },

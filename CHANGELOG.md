@@ -2,6 +2,13 @@
 
 本项目所有重要改动均记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。最新版本在上，版本号与游戏内更新日志同步。
 
+## [4.9.8] - 2026-08-10
+
+### 修复
+
+- **红石中继器成就**（`achievements.js`）：物品 ID 由无效的 `minecraft:redstone_repeater` 修正为基岩版实际 ID `minecraft:repeater`，持有红石中继器可正常解锁【雷石东直放站】。
+- **头顶称号本人可见**（`title.js`）：称号重建（换称号/站起/换维）时新建的 TextPrimitive 未设置 `visibleTo`，会短暂对本人可见；现在创建时即排除本人，并补充单人在线保护。
+
 ## [4.9.7] - 2026-08-10
 
 ### 调整
