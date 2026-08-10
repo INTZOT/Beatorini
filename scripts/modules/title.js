@@ -55,6 +55,7 @@ function getTitleShapeColor(playerId) {
 function buildTitleShape(player) {
   const text = getTitleShapeText(player.id);
   if (!text) return;
+  if (player.isSneaking) return; // 下蹲时不显示
   try {
     const shape = new TextPrimitive(
       { x: 0, y: TITLE_OFFSET_Y, z: 0 },
@@ -180,6 +181,15 @@ export function init() {
     if (titleShapes.has(event.player.id)) {
       syncTitleShape(event.player);
     }
+  });
+  // 下蹲隐藏 / 站起恢复
+  world.afterEvents.entityStartSneaking.subscribe((event) => {
+    if (event.entity.typeId !== "minecraft:player") return;
+    removeTitleShape(event.entity.id);
+  });
+  world.afterEvents.entityStopSneaking.subscribe((event) => {
+    if (event.entity.typeId !== "minecraft:player") return;
+    syncTitleShape(event.entity);
   });
   world.afterEvents.worldLoad.subscribe(() => {
     system.runTimeout(() => {
