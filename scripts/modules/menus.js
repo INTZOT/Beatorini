@@ -491,10 +491,14 @@ export function init() {
   // ============================================================
   // 手持空桶右键黑曜石 → 回收为岩浆桶
   // ============================================================
-  world.afterEvents.playerInteractWithBlock.subscribe((event) => {
-    const { player, block, itemStack } = event;
-    if (!itemStack || itemStack.typeId !== "minecraft:bucket") return;
-    if (block.typeId !== "minecraft:obsidian") return;
+  world.afterEvents.itemUse.subscribe((event) => {
+    const { source: player, itemStack } = event;
+    if (itemStack.typeId !== "minecraft:bucket") return;
+
+    // 视线射线锁定面前的黑曜石（5 格内）
+    const hit = player.getBlockFromViewDirection({ maxDistance: 5 });
+    const block = hit?.block;
+    if (!block || block.typeId !== "minecraft:obsidian") return;
 
     block.setType("minecraft:air");
 
