@@ -249,7 +249,7 @@ function ensureVaultEntitiesAfterLoad(attempt) {
 }
 
 // ============================================================
-// 调试：无损往返测试（#vaulttest，op 专属）
+// 调试：无损往返测试（原 #vaulttest 命令已移除，此函数保留备用）
 // ============================================================
 export function debugVault(player) {
   try {

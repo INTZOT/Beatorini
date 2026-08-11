@@ -23,7 +23,7 @@ import { init as initTools } from "./modules/tools.js";
 import { init as initMobDensity } from "./modules/mob-density.js";
 
 // --- 菜单与聊天路由 ---
-import { init as initMenus } from "./modules/menus.js";
+import { init as initMenus, registerCustomCommands } from "./modules/menus.js";
 
 // ============================================================
 // 启动所有模块
@@ -48,5 +48,6 @@ initTrader();
 initTools();
 initMobDensity();
 initMenus();
+registerCustomCommands();
 
 console.warn("[Beatorini] All modules initialized!");

@@ -311,7 +311,7 @@ export function handleIsland(player) {
     system.runTimeout(() => {
       try {
         teleportToIslandSafe(player, boundIndex);
-        player.sendMessage("§a已将你传送回空岛！输入 #lobby 以返回大厅！");
+        player.sendMessage("§a已将你传送回空岛！右键时钟打开菜单返回大厅！");
         player.playSound("random.orb");
         try {
           player.removeTag("visitor");
@@ -484,7 +484,7 @@ export function handleTransfer(player, targetName) {
 // 放弃岛屿
 // ============================================================
 
-function giveMenuClock(player) {
+export function giveMenuClock(player) {
   try {
     const inventory = player.getComponent("inventory").container;
     // 清理已有菜单时钟，避免重复堆积

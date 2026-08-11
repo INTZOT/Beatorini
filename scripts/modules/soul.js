@@ -1,6 +1,6 @@
 // ============================================================
 // 灵魂出窍：原地生成盔甲架标记位置，玩家切换旁观者模式自由飞行；
-// #fc off 传送回标记位置并恢复原游戏模式。
+// /fc off 传送回标记位置并恢复原游戏模式。
 // 出窍状态落盘（动态属性），脚本重载/玩家重连自动恢复。
 // ============================================================
 import { system, world } from "@minecraft/server";
@@ -55,7 +55,7 @@ function enterSoul(player) {
     player.runCommand("gamemode spectator @s");
 
     player.sendMessage(
-      "§a已开启灵魂出窍！身体位置已标记，输入 #fc off 传送回身体"
+      "§a已开启灵魂出窍！身体位置已标记，输入 /fc off 传送回身体"
     );
     player.playSound("random.orb");
   } catch (e) {

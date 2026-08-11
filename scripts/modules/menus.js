@@ -1,4 +1,4 @@
-import { system, world, ItemStack, EntityInitializationCause } from "@minecraft/server";
+import { system, world, ItemStack, EntityInitializationCause, CommandPermissionLevel, CustomCommandParamType, CustomCommandStatus } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
 import { getPlayerMoney } from "./money.js";
 import { getPlayerTitle, showTitleMenu } from "./title.js";
@@ -7,9 +7,7 @@ import {
   handleLobby,
   handleSpawn,
   handleIsland,
-  handleVisitRequest,
-  handleJoinRequest,
-  handleTransfer,
+  giveMenuClock,
   showIslandSubMenu,
   getIslandStatus,
   getIslandOwner,
@@ -22,12 +20,11 @@ import {
 import { getAchievements, ACHIEVEMENTS } from "./achievements.js";
 import { showLeaderboardMenu } from "./leaderboard.js";
 import { showTalentMenu } from "./talent.js";
-import { toggleSoul, isSoulActive } from "./soul.js";
+import { toggleSoul } from "./soul.js";
 import { showMarketMenu, showMarketUnlockForm, onPlayerJoin as marketOnPlayerJoin } from "./market.js";
 import { showRecycleCategoryMenu } from "./recycle.js";
 import { showSigninForm } from "./signin.js";
 import { showAssistantMenu, getAssistSettings } from "./assistants.js";
-import { debugVault } from "./vault.js";
 import { showLotteryMenu } from "./lottery.js";
 import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
 
@@ -362,97 +359,76 @@ function getBoundCount() {
 // 聊天路由
 // ============================================================
 
+// ============================================================
+// 自定义命令注册（/beatorini:xxx）
+// ============================================================
+
+export function registerCustomCommands() {
+  system.beforeEvents.startup.subscribe((event) => {
+    const registry = event.customCommandRegistry;
+
+    // /beatorini:menu - 领取菜单时钟
+    registry.registerCommand(
+      {
+        name: "beatorini:menu",
+        description: "领取菜单时钟",
+        permissionLevel: CommandPermissionLevel.Any,
+        cheatsRequired: false,
+      },
+      (origin) => {
+        const player = origin.sourceEntity;
+        if (!player || player.typeId !== "minecraft:player") {
+          return {
+            status: CustomCommandStatus.Failure,
+            message: "该命令只能由玩家执行",
+          };
+        }
+        system.runTimeout(() => giveMenuClock(player), 0);
+        return { status: CustomCommandStatus.Success };
+      }
+    );
+
+    // /beatorini:fc on|off - 灵魂出窍
+    registry.registerEnum("beatorini:fc_mode", ["on", "off"]);
+    registry.registerCommand(
+      {
+        name: "beatorini:fc",
+        description: "开启/关闭灵魂出窍",
+        permissionLevel: CommandPermissionLevel.Any,
+        cheatsRequired: false,
+        mandatoryParameters: [
+          { type: CustomCommandParamType.Enum, name: "beatorini:fc_mode" },
+        ],
+      },
+      (origin, mode) => {
+        const player = origin.sourceEntity;
+        if (!player || player.typeId !== "minecraft:player") {
+          return {
+            status: CustomCommandStatus.Failure,
+            message: "该命令只能由玩家执行",
+          };
+        }
+        const on = mode === "on";
+        system.runTimeout(() => toggleSoul(player, on), 0);
+        return { status: CustomCommandStatus.Success };
+      }
+    );
+  });
+}
+
 export function init() {
   world.beforeEvents.chatSend.subscribe((event) => {
     const player = event.sender;
 
-    // 灵魂出窍中禁止使用其他命令（#fc off 除外）
-    if (
-      isSoulActive(player.id) &&
-      event.message.startsWith("#") &&
-      event.message !== "#fc off"
-    ) {
-      event.cancel = true;
-      player.sendMessage("§c灵魂出窍中无法使用其他命令，输入 #fc off 退出");
-      return;
-    }
-
-    // #lobby
-    if (event.message === "#lobby") {
-      event.cancel = true;
-      handleLobby(player);
-      return;
-    }
-
-    if (event.message === "#spawn") {
-      event.cancel = true;
-      handleSpawn(player);
-      return;
-    }
-    if (event.message === "#island") {
-      event.cancel = true;
-      handleIsland(player);
-      return;
-    }
-    if (event.message === "#fc on" || event.message === "#fc off") {
-      event.cancel = true;
-      const on = event.message === "#fc on";
-      system.runTimeout(() => toggleSoul(player, on), 1);
-      return;
-    }
-    if (event.message === "#menu") {
-      event.cancel = true;
-      system.runTimeout(() => {
-        const inventory = player.getComponent("inventory").container;
-        const clock = new ItemStack("minecraft:clock", 1);
-        const leftover = inventory.addItem(clock);
-        if (leftover) player.dimension.spawnItem(leftover, player.location);
-        player.sendMessage("§a右键时钟打开空岛菜单！");
-        player.playSound("random.orb");
-      }, 0);
-      return;
-    }
-    if (event.message.startsWith("#visit ")) {
-      event.cancel = true;
-      let targetName = event.message.slice(7).trim();
-      if (targetName.startsWith("@")) targetName = targetName.slice(1);
-      handleVisitRequest(player, targetName);
-      return;
-    }
-    if (event.message.startsWith("#join ")) {
-      event.cancel = true;
-      let targetName = event.message.slice(6).trim();
-      if (targetName.startsWith("@")) targetName = targetName.slice(1);
-      handleJoinRequest(player, targetName);
-      return;
-    }
-    if (event.message.startsWith("#transfer ")) {
-      event.cancel = true;
-      let targetName = event.message.slice(10).trim();
-      if (targetName.startsWith("@")) targetName = targetName.slice(1);
-      handleTransfer(player, targetName);
-      return;
-    }
-    if (event.message === "#vaulttest") {
-      event.cancel = true;
-      if (!player.hasTag("op")) {
-        player.sendMessage("§c你没有权限使用此命令！");
-        return;
-      }
-      debugVault(player);
-      return;
-    }
     // 普通聊天消息添加称号前缀
-    if (!event.cancel) {
-      event.cancel = true;
-      world.sendMessage(
-        getPlayerTitle(player.id) +
-          " <" +
-          player.name +
-          "> " +
-          event.message
-      );
-    }
+    event.cancel = true;
+    world.sendMessage(
+      getPlayerTitle(player.id) +
+        " <" +
+        player.name +
+        "> " +
+        event.message
+    );
   });
 
   // --- 右键时钟弹出菜单 ---
@@ -572,12 +548,11 @@ export function init() {
   // ============================================================
   const TIPS = [
     "§etips: 右键时钟打开主菜单，体验全部玩法！",
-    "§etips: 输入 #island 回到你的岛屿！",
-    "§etips: 输入 #lobby 回到世界大厅！",
-    "§etips: 输入 #spawn 设置重生点！",
-    "§etips: 输入 #visit @玩家名 申请访问他人岛屿！",
-    "§etips: 输入 #join @玩家名 申请加入他人岛屿！",
-    "§etips: 输入 #fc on 开启灵魂出窍，r96 范围内自由探索！",
+    "§etips: 输入 /menu 领取菜单时钟！",
+    "§etips: 主菜单可返回大厅、设置出生点、管理岛屿！",
+    "§etips: 岛屿菜单可申请访问或加入他人岛屿！",
+    "§etips: 输入 /fc on 开启灵魂出窍，r96 范围内自由探索！",
+    "§etips: 输入 /fc off 传送回身体！",
     "§etips: 岛屿会定期刷新流浪商人哦~",
     "§etips: 持有特定物品会自动解锁成就并奖励金币！",
     "§etips: 称号按里程碑解锁，佩戴后显示在头顶！",
@@ -692,14 +667,9 @@ export function init() {
     } else {
       markPlayerJoined(player.id);
       player.sendMessage(
-        `§a欢迎新玩家 ${player.name}！请输入 #island 以开启空岛之旅`
+        `§a欢迎新玩家 ${player.name}！输入 /menu 或右键时钟开启空岛之旅`
       );
-      system.runTimeout(() => {
-        const inv = player.getComponent("inventory").container;
-        const clock = new ItemStack("minecraft:clock", 1);
-        const leftover = inv.addItem(clock);
-        if (leftover) player.dimension.spawnItem(leftover, player.location);
-      }, 20);
+      system.runTimeout(() => giveMenuClock(player), 20);
     }
 
     // 玩家重连：主世界玩家不做处理；其他非空岛维度玩家传送至大厅

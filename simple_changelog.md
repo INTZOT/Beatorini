@@ -3,6 +3,13 @@
 > 各版本格式与详细程度一致，可整段复制到 QQ 群公告。
 > 本文件面向 QQ 公告，不含 Minecraft 颜色代码；游戏内 signin.js 仍使用颜色代码，发版时另行同步。
 
+## Release 4.9.9
+
+▸ 调整
+  - 命令系统迁移：删除 #lobby/#spawn/#island/#visit/#join/#transfer/#vaulttest
+  - 新增自定义命令：/menu 领取时钟，/fc on|off 灵魂出窍
+  - 提示与欢迎文案同步更新
+
 ## Release 4.9.8
 
 ▸ 修复

@@ -2,6 +2,13 @@
 
 本项目所有重要改动均记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。最新版本在上，版本号与游戏内更新日志同步。
 
+## [4.9.9] - 2026-08-11
+
+### 调整
+
+- **命令系统迁移**（`menus.js`）：删除聊天命令 `#lobby`/`#spawn`/`#island`/`#visit`/`#join`/`#transfer`/`#vaulttest`；通过 `customCommandRegistry` 注册自定义命令 `/beatorini:menu`（领取菜单时钟）与 `/beatorini:fc on|off`（灵魂出窍开关），游戏内可直接使用 `/menu`、`/fc on`、`/fc off`。
+- **提示与文案更新**：随机 tips、新玩家欢迎语、回岛提示、灵魂出窍提示统一改为新命令，不再引用已删除的 `#` 命令。
+
 ## [4.9.8] - 2026-08-10
 
 ### 修复

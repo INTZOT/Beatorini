@@ -19,11 +19,11 @@ const SERVER_ANNOUNCEMENTS = [
 // --- 进入表单的服务器更新日志（最新在上） ---
 const SERVER_CHANGELOGS = [
   {
-    version: "Release 4.9.8",
+    version: "Release 4.9.9",
     items: [
-      "§a▸ 修复",
-      "  §7红石中继器成就无法解锁：修正物品ID",
-      "  §7头顶称号偶尔本人可见：重建时同步排除本人",
+      "§a▸ 调整",
+      "  §7命令系统迁移：删除#lobby等旧聊天命令",
+      "  §7新增自定义命令：/menu 领取时钟，/fc on|off 灵魂出窍",
     ],
   },
 ];
