@@ -2,6 +2,7 @@ import { system, world } from "@minecraft/server";
 import {
   DIMENSION_NAMESPACE,
   DIMENSION_COUNT,
+  LOBBY_DIMENSION_ID,
   LAST_TRADER_DAY_PREFIX,
 } from "./config.js";
 import { getPlayerBoundIndex } from "./island.js";
@@ -50,8 +51,28 @@ function findSafeSpawnNear(player) {
   return null;
 }
 
+/** 清理主世界（大厅）中自然生成的流浪商人及行商羊驼，返回清理数量 */
+function cleanMainWorldTraders() {
+  let cleaned = 0;
+  try {
+    const dim = world.getDimension(LOBBY_DIMENSION_ID);
+    for (const type of [
+      "minecraft:wandering_trader",
+      "minecraft:trader_llama",
+    ]) {
+      for (const ent of dim.getEntities({ type })) {
+        try {
+          ent.remove();
+          cleaned++;
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  return cleaned;
+}
+
 export function init() {
-  // 启动时清理服务器重启遗留的僵尸流浪商人
+  // 启动时清理服务器重启遗留的流浪商人（岛屿维度 + 主世界大厅）
   system.runTimeout(() => {
     let cleaned = 0;
     for (let i = 1; i <= DIMENSION_COUNT; i++) {
@@ -66,12 +87,16 @@ export function init() {
         }
       } catch (e) {}
     }
+    cleaned += cleanMainWorldTraders();
     if (cleaned > 0) {
       console.warn(
         `[Trader] Cleaned up ${cleaned} stale wandering traders from previous session`
       );
     }
   }, 40);
+
+  // 定期清理主世界自然生成的流浪商人（大厅为安全区，不保留自然商人）
+  system.runInterval(() => cleanMainWorldTraders(), 400);
 
   // --- 每2个游戏日正午在玩家空岛生成流浪商人 ---
   system.runInterval(() => {

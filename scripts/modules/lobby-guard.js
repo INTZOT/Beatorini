@@ -1,12 +1,18 @@
 // ============================================================
 // 大厅保护：主世界（大厅）内非管理员禁止破坏/放置方块、
-// 攻击、使用道具、交互方块与实体。管理员以 op tag 判定。
-// 菜单时钟必须放行（右键时钟走 itemUse 事件打开菜单）。
+// 攻击、使用道具、交互方块与实体；并阻止主世界生成实体（白名单放行）。
+// 管理员以 op tag 判定。菜单时钟必须放行（右键时钟走 itemUse 事件打开菜单）。
 // ============================================================
 import { system, world } from "@minecraft/server";
 import { LOBBY_DIMENSION_ID } from "./config.js";
 
 const warnCooldown = new Map();
+
+// 主世界实体生成白名单：其余实体生成后立即移除（玩家/签到烟花放行）
+const ENTITY_SPAWN_WHITELIST = new Set([
+  "minecraft:player",
+  "minecraft:fireworks_rocket",
+]);
 
 function isAdmin(entity) {
   return entity?.hasTag?.("op") ?? false;
@@ -24,6 +30,16 @@ function warnOnce(player, message) {
 }
 
 export function init() {
+  // 阻止主世界生成实体（白名单放行）：同时拦截自然流浪商人/物品掉落等
+  world.afterEvents.entitySpawn.subscribe((event) => {
+    const ent = event.entity;
+    if (!ent || ent.dimension?.id !== LOBBY_DIMENSION_ID) return;
+    if (ENTITY_SPAWN_WHITELIST.has(ent.typeId)) return;
+    try {
+      ent.remove();
+    } catch (e) {}
+  });
+
   world.beforeEvents.playerBreakBlock.subscribe((event) => {
     const p = event.player;
     if (!isAdmin(p) && inLobby(p)) {
