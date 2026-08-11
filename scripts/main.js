@@ -21,6 +21,7 @@ import { init as initOreGen } from "./modules/ore-gen.js";
 import { init as initTrader } from "./modules/trader.js";
 import { init as initTools } from "./modules/tools.js";
 import { init as initMobDensity } from "./modules/mob-density.js";
+import { init as initChatBubble } from "./modules/chatbubble.js";
 
 // --- 菜单与聊天路由 ---
 import { init as initMenus, registerCustomCommands } from "./modules/menus.js";
@@ -47,6 +48,7 @@ initOreGen();
 initTrader();
 initTools();
 initMobDensity();
+initChatBubble();
 initMenus();
 registerCustomCommands();
 

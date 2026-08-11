@@ -19,8 +19,11 @@ const SERVER_ANNOUNCEMENTS = [
 // --- 进入表单的服务器更新日志（最新在上） ---
 const SERVER_CHANGELOGS = [
   {
-    version: "Release 4.9.9",
+    version: "Release 4.10.0",
     items: [
+      "§a▸ 新增",
+      "  §7聊天气泡：聊天时头顶显示悬浮气泡，5秒后消失",
+      "  §7局域聊天：#前缀消息不广播，仅显示气泡",
       "§a▸ 调整",
       "  §7命令系统迁移：删除#lobby等旧聊天命令",
       "  §7新增自定义命令：/menu 领取时钟，/fc on|off 灵魂出窍",

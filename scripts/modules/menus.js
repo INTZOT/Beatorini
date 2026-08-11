@@ -25,6 +25,7 @@ import { showMarketMenu, showMarketUnlockForm, onPlayerJoin as marketOnPlayerJoi
 import { showRecycleCategoryMenu } from "./recycle.js";
 import { showSigninForm } from "./signin.js";
 import { showAssistantMenu, getAssistSettings } from "./assistants.js";
+import { addChatBubble } from "./chatbubble.js";
 import { showLotteryMenu } from "./lottery.js";
 import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
 
@@ -419,16 +420,26 @@ export function registerCustomCommands() {
 export function init() {
   world.beforeEvents.chatSend.subscribe((event) => {
     const player = event.sender;
+    const message = event.message;
 
-    // 普通聊天消息添加称号前缀
+    // 局域聊天：# 前缀仅生成气泡，不进行全服广播
+    if (message.startsWith("#")) {
+      event.cancel = true;
+      const text = message.slice(1).trim();
+      if (text) addChatBubble(player, text);
+      return;
+    }
+
+    // 普通聊天：称号前缀全服广播 + 聊天气泡
     event.cancel = true;
     world.sendMessage(
       getPlayerTitle(player.id) +
         " <" +
         player.name +
         "> " +
-        event.message
+        message
     );
+    addChatBubble(player, message);
   });
 
   // --- 右键时钟弹出菜单 ---
@@ -553,6 +564,7 @@ export function init() {
     "§etips: 岛屿菜单可申请访问或加入他人岛屿！",
     "§etips: 输入 /fc on 开启灵魂出窍，r96 范围内自由探索！",
     "§etips: 输入 /fc off 传送回身体！",
+    "§etips: 聊天前加 # 可进行局域聊天，仅显示头顶气泡！",
     "§etips: 岛屿会定期刷新流浪商人哦~",
     "§etips: 持有特定物品会自动解锁成就并奖励金币！",
     "§etips: 称号按里程碑解锁，佩戴后显示在头顶！",
