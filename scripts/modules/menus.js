@@ -18,7 +18,12 @@ import {
   hasPlayerJoinedBefore,
 } from "./island.js";
 import { getAchievements, ACHIEVEMENTS } from "./achievements.js";
-import { showLeaderboardMenu } from "./leaderboard.js";
+import {
+  showLeaderboardMenu,
+  setBoardPosition,
+  clearBoardPosition,
+} from "./leaderboard.js";
+import { STATS_CATEGORIES } from "./stats.js";
 import { showTalentMenu } from "./talent.js";
 import { toggleSoul } from "./soul.js";
 import { showMarketMenu, showMarketUnlockForm, onPlayerJoin as marketOnPlayerJoin } from "./market.js";
@@ -411,6 +416,52 @@ export function registerCustomCommands() {
         }
         const on = mode === "on";
         system.runTimeout(() => toggleSoul(player, on), 0);
+        return { status: CustomCommandStatus.Success };
+      }
+    );
+
+    // /beatorini:lb set|clear <分类> - 大厅悬浮排行榜位置（管理员）
+    registry.registerEnum(
+      "beatorini:lb_category",
+      STATS_CATEGORIES.map((c) => c.key)
+    );
+    registry.registerEnum("beatorini:lb_action", ["set", "clear"]);
+    registry.registerCommand(
+      {
+        name: "beatorini:lb",
+        description: "设置/清除大厅悬浮排行榜位置",
+        permissionLevel: CommandPermissionLevel.Admin,
+        cheatsRequired: false,
+        mandatoryParameters: [
+          { type: CustomCommandParamType.Enum, name: "beatorini:lb_action" },
+          { type: CustomCommandParamType.Enum, name: "beatorini:lb_category" },
+        ],
+      },
+      (origin, action, categoryKey) => {
+        const player = origin.sourceEntity;
+        if (!player || player.typeId !== "minecraft:player") {
+          return {
+            status: CustomCommandStatus.Failure,
+            message: "该命令只能由玩家执行",
+          };
+        }
+        system.runTimeout(() => {
+          if (action === "set") {
+            if (
+              setBoardPosition(categoryKey, player.location, player.getRotation().y)
+            ) {
+              player.sendMessage(`§a已设置「${categoryKey}」排行榜位置`);
+            } else {
+              player.sendMessage("§c无效的排行榜分类");
+            }
+          } else if (action === "clear") {
+            if (clearBoardPosition(categoryKey)) {
+              player.sendMessage(`§a已清除「${categoryKey}」排行榜位置`);
+            } else {
+              player.sendMessage("§c无效的排行榜分类");
+            }
+          }
+        }, 0);
         return { status: CustomCommandStatus.Success };
       }
     );

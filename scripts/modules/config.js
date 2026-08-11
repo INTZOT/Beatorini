@@ -56,6 +56,10 @@ export const STATS_DEATHS_PREFIX = "stats:deaths_";
 export const STATS_LOTTERY_PREFIX = "stats:lottery_";
 export const PLAYER_NAME_PREFIX = "player:name_"; // 玩家 ID → 名字映射（离线显示用）
 
+// --- 大厅悬浮排行榜 ---
+export const LEADERBOARD_DISPLAY_PREFIX = "leaderboard:display_"; // 各分类位置 JSON：{x,y,z,scale}
+export const LEADERBOARD_DISPLAY_COUNT = 10; // 悬浮榜显示条数
+
 // --- 天赋 ---
 export const TALENT_PREFIX = "talent:lv_";
 export const TALENT_MAX_LEVEL = 120;

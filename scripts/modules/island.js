@@ -243,13 +243,6 @@ export function handleLobby(player) {
       player.removeTag("visitor");
       player.addTag("member");
     } catch (e) {}
-    system.runTimeout(() => {
-      try {
-        if (String(player.getGameMode()).toLowerCase() !== "survival") {
-          player.runCommand("gamemode survival @s");
-        }
-      } catch (e) {}
-    }, 2);
   }, 0);
 }
 
