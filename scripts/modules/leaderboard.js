@@ -88,7 +88,6 @@ export function showLeaderboardMenu(player, backFn) {
 // 位置通过动态属性持久化，管理员命令 /beatorini:lb set|clear <分类>
 // ============================================================
 
-const LB_LINE_SPACING = 0.4; // 行间距
 const boards = new Map(); // categoryKey -> { shapes: TextPrimitive[] }
 
 function categoryByKey(key) {
@@ -125,6 +124,19 @@ function clearCategoryShapes(categoryKey) {
   boards.delete(categoryKey);
 }
 
+/** 生成单块排行榜文本（\n 多行 + § 颜色） */
+function buildBoardText(category, entries) {
+  const lines = [`§b${category.icon} ${category.name} TOP${entries.length}`];
+  entries.forEach((entry, i) => {
+    const color =
+      i === 0 ? "§6" : i === 1 ? "§7" : i === 2 ? "§x§d§9§9§9§5§9" : "§f";
+    lines.push(
+      `${color}${i + 1}. ${entry.name} - ${category.format(entry.value)}`
+    );
+  });
+  return lines.join("\n");
+}
+
 /** 完整重建某分类的悬浮榜（位置变化/条数变化时调用） */
 function renderBoard(categoryKey) {
   clearCategoryShapes(categoryKey);
@@ -137,54 +149,25 @@ function renderBoard(categoryKey) {
     0,
     LEADERBOARD_DISPLAY_COUNT
   );
-  const shapes = [];
-  const baseColor = { red: 1, green: 1, blue: 1, alpha: 1 };
-
-  const makeShape = (offsetY, text, color) => {
-    try {
-      const shape = new TextPrimitive(
-        { x: pos.x, y: pos.y + offsetY, z: pos.z, dimension: lobby },
-        text
-      );
-      shape.scale = pos.scale ?? 1;
-      shape.color = color;
-      shape.backgroundColorOverride = {
-        red: 0,
-        green: 0,
-        blue: 0,
-        alpha: 0.45,
-      };
-      shape.depthTest = false;
-      world.primitiveShapesManager.addText(shape, lobby);
-      shapes.push(shape);
-    } catch (e) {
-      console.warn(`[Leaderboard] 悬浮榜创建失败 ${categoryKey}: ${e}`);
-    }
-  };
-
-  makeShape(0, `${category.icon} ${category.name} TOP${entries.length}`, {
-    red: 0.55,
-    green: 0.85,
-    blue: 1,
-    alpha: 1,
-  });
-  entries.forEach((entry, i) => {
-    const color =
-      i === 0
-        ? { red: 1, green: 0.85, blue: 0.2, alpha: 1 }
-        : i === 1
-          ? { red: 0.75, green: 0.75, blue: 0.78, alpha: 1 }
-          : i === 2
-            ? { red: 0.85, green: 0.6, blue: 0.35, alpha: 1 }
-            : baseColor;
-    makeShape(
-      -(i + 1) * LB_LINE_SPACING,
-      `${i + 1}. ${entry.name} - ${category.format(entry.value)}`,
-      color
+  try {
+    const shape = new TextPrimitive(
+      { x: pos.x, y: pos.y, z: pos.z, dimension: lobby },
+      buildBoardText(category, entries)
     );
-  });
-
-  boards.set(categoryKey, { shapes });
+    shape.scale = pos.scale ?? 1;
+    shape.color = { red: 1, green: 1, blue: 1, alpha: 1 };
+    shape.backgroundColorOverride = {
+      red: 0,
+      green: 0,
+      blue: 0,
+      alpha: 0.45,
+    };
+    shape.depthTest = false;
+    world.primitiveShapesManager.addText(shape, lobby);
+    boards.set(categoryKey, { shapes: [shape] });
+  } catch (e) {
+    console.warn(`[Leaderboard] 悬浮榜创建失败 ${categoryKey}: ${e}`);
+  }
 }
 
 /** 实时刷新某分类的悬浮榜（复用已有 shape，仅更新文本与颜色） */
@@ -200,31 +183,13 @@ function refreshBoard(categoryKey) {
     LEADERBOARD_DISPLAY_COUNT
   );
   const board = boards.get(categoryKey);
-  if (!board || board.shapes.length !== entries.length + 1) {
+  if (!board || board.shapes.length !== 1) {
     renderBoard(categoryKey);
     return;
   }
-  board.shapes.forEach((shape, index) => {
-    try {
-      if (index === 0) {
-        shape.setText(`${category.icon} ${category.name} TOP${entries.length}`);
-        shape.color = { red: 0.55, green: 0.85, blue: 1, alpha: 1 };
-      } else {
-        const entry = entries[index - 1];
-        shape.setText(
-          `${index}. ${entry.name} - ${category.format(entry.value)}`
-        );
-        shape.color =
-          index === 1
-            ? { red: 1, green: 0.85, blue: 0.2, alpha: 1 }
-            : index === 2
-              ? { red: 0.75, green: 0.75, blue: 0.78, alpha: 1 }
-              : index === 3
-              ? { red: 0.85, green: 0.6, blue: 0.35, alpha: 1 }
-              : { red: 1, green: 1, blue: 1, alpha: 1 };
-      }
-    } catch (e) {}
-  });
+  try {
+    board.shapes[0].setText(buildBoardText(category, entries));
+  } catch (e) {}
 }
 
 /** 设置某分类悬浮榜位置（管理员命令调用） */

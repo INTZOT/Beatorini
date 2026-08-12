@@ -12,6 +12,7 @@ const warnCooldown = new Map();
 const ENTITY_SPAWN_WHITELIST = new Set([
   "minecraft:player",
   "minecraft:fireworks_rocket",
+  "minecraft:armor_stand",
 ]);
 
 function isAdmin(entity) {

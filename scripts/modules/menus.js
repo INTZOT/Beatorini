@@ -9,11 +9,6 @@ import {
   handleIsland,
   giveMenuClock,
   showIslandSubMenu,
-  getIslandStatus,
-  getIslandOwner,
-  getIslandMembers,
-  setIslandStatus,
-  getPlayerNameById,
   markPlayerJoined,
   hasPlayerJoinedBefore,
 } from "./island.js";
@@ -32,7 +27,8 @@ import { showSigninForm } from "./signin.js";
 import { showAssistantMenu, getAssistSettings } from "./assistants.js";
 import { addChatBubble } from "./chatbubble.js";
 import { showLotteryMenu } from "./lottery.js";
-import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MAX_ISLAND_MEMBERS, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
+import { showAdminMenu } from "./admin.js";
+import { DIMENSION_NAMESPACE, LOBBY_DIMENSION_ID, MARKET_UNLOCKED_PREFIX, TRANSFER_TAX_RATE } from "./config.js";
 
 // ============================================================
 // 主菜单
@@ -279,87 +275,6 @@ function showTransferMoneyForm(player) {
 // ============================================================
 // 管理员面板
 // ============================================================
-
-function showAdminMenu(player) {
-  const total = getBoundCount();
-  if (total === 0) {
-    player.sendMessage("§c暂无岛屿数据");
-    return;
-  }
-
-  const STATUS_COLOR = {
-    active: "§a",
-    dirty: "§c",
-    pending: "§b",
-    cleaning: "§e",
-    review: "§d",
-  };
-  const STATUS_TEXT = {
-    active: "使用中",
-    dirty: "待重置",
-    pending: "待绑定",
-    cleaning: "清理中",
-    review: "待确认",
-  };
-
-  const form = new CustomForm(player, "管理员面板");
-  form.label(`§6共 ${total} 个岛屿`);
-
-  for (let i = 1; i <= total; i++) {
-    form.spacer();
-    const status = getIslandStatus(i) || "unknown";
-    const owner = getIslandOwner(i);
-    const ownerName = owner ? getPlayerNameById(owner) : "无";
-    const members = getIslandMembers(i);
-    const color = STATUS_COLOR[status] || "§7";
-    const text = STATUS_TEXT[status] || status;
-
-    form.label(
-      `§e岛屿 #${i}  ${color}[${text}]  §7岛主: ${ownerName}  §7成员: ${members.length}/${MAX_ISLAND_MEMBERS}`
-    );
-    form.spacer();
-
-    form.button(`传送至岛屿 #${i}`, () => {
-      form.close();
-      const dimId = `${DIMENSION_NAMESPACE}:void_${i}`;
-      try {
-        const dim = world.getDimension(dimId);
-        player.teleport({ x: 0, y: 100, z: 0 }, { dimension: dim });
-        player.sendMessage(`§a已传送至岛屿 #${i} (0, 100, 0)`);
-      } catch (e) {
-        player.sendMessage(`§c无法传送至岛屿 #${i}`);
-      }
-    });
-
-    if (status === "dirty") {
-      form.spacer();
-      form.button(`标记岛屿 #${i} 为待绑定`, () => {
-        setIslandStatus(i, "pending");
-        form.close();
-        player.sendMessage(`§a岛屿 #${i} 已标记为待绑定`);
-        player.playSound("random.orb");
-      });
-    }
-
-    if (status === "review") {
-      form.spacer();
-      form.button(`确认开放岛屿 #${i}`, () => {
-        setIslandStatus(i, "pending");
-        form.close();
-        player.sendMessage(`§a岛屿 #${i} 已确认开放，可重新分配`);
-        player.playSound("random.orb");
-      });
-    }
-  }
-
-  form.spacer().button("关闭", () => form.close());
-  form.show().catch((e) => console.warn("Form show failed:", e));
-}
-
-// Also need getBoundCount - it's internal to island.js but let's just read the counter
-function getBoundCount() {
-  return world.getDynamicProperty("island:bound_counter") ?? 0;
-}
 
 // ============================================================
 // 聊天路由

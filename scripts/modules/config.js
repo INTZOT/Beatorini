@@ -60,6 +60,10 @@ export const PLAYER_NAME_PREFIX = "player:name_"; // 玩家 ID → 名字映射�
 export const LEADERBOARD_DISPLAY_PREFIX = "leaderboard:display_"; // 各分类位置 JSON：{x,y,z,scale}
 export const LEADERBOARD_DISPLAY_COUNT = 10; // 悬浮榜显示条数
 
+// --- 悬浮公告 ---
+export const NOTICE_LIST_KEY = "notice:list"; // 公告列表 JSON
+export const NOTICE_MAX = 32; // 公告数量上限
+
 // --- 天赋 ---
 export const TALENT_PREFIX = "talent:lv_";
 export const TALENT_MAX_LEVEL = 120;
