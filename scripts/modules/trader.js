@@ -95,9 +95,6 @@ export function init() {
     }
   }, 40);
 
-  // 定期清理主世界自然生成的流浪商人（大厅为安全区，不保留自然商人）
-  system.runInterval(() => cleanMainWorldTraders(), 400);
-
   // --- 每2个游戏日正午在玩家空岛生成流浪商人 ---
   system.runInterval(() => {
     const timeOfDay = world.getTimeOfDay();

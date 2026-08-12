@@ -745,7 +745,7 @@ export function init() {
       system.runTimeout(() => {
         try {
           const lobby = world.getDimension(LOBBY_DIMENSION_ID);
-          player.teleport({ x: 0, y: 0, z: 0 }, { dimension: lobby });
+          player.teleport({ x: 0, y: 64, z: 0 }, { dimension: lobby });
         } catch (e) {
           console.error(`[Spawn] Lobby redirect failed: ${e}`);
         }
