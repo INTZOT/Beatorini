@@ -16,6 +16,7 @@ import {
 } from "./island.js";
 import { getPlayerNameById } from "./stats.js";
 import { showNoticeAdminMenu } from "./notice.js";
+import { showLeaderboardAdminMenu } from "./leaderboard.js";
 
 function getBoundCount() {
   return world.getDynamicProperty("island:bound_counter") ?? 0;
@@ -34,6 +35,11 @@ export function showAdminMenu(player) {
   form.button("公告管理", () => {
     form.close();
     system.runTimeout(() => showNoticeAdminMenu(player, showAdminMenu), 2);
+  });
+  form.spacer();
+  form.button("排行榜管理", () => {
+    form.close();
+    system.runTimeout(() => showLeaderboardAdminMenu(player, showAdminMenu), 2);
   });
   form.spacer();
   form.button("关闭", () => form.close());

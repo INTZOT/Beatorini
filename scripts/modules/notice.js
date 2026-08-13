@@ -54,7 +54,8 @@ function clearShapes(id) {
 function renderNotice(entry) {
   clearShapes(entry.id);
   const lobby = world.getDimension(LOBBY_DIMENSION_ID);
-  const lines = String(entry.text || "").split("\n");
+  // 兼容字面 \n（从输入框粘贴的复制版）与真实换行
+  const lines = String(entry.text || "").replace(/\\n/g, "\n").split("\n");
   const shapes = [];
   const color = {
     ...(COLOR_PRESETS[entry.colorIndex]?.rgb || COLOR_PRESETS[0].rgb),

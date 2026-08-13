@@ -129,7 +129,7 @@ const NETHER_REWARDS = [
   ["minecraft:soul_sand", "灵魂沙", "common", 16],
   ["minecraft:basalt", "玄武岩", "common", 16],
   ["minecraft:blackstone", "黑石", "common", 16],
-  ["minecraft:magma_block", "岩浆块", "common", 16],
+  ["minecraft:magma", "岩浆块", "common", 16],
   ["minecraft:crimson_nylium", "绯红菌岩", "rare", 4],
   ["minecraft:warped_nylium", "诡异菌岩", "rare", 4],
   ["minecraft:weeping_vines", "垂泪藤", "rare", 4],

@@ -58,7 +58,7 @@ export const PLAYER_NAME_PREFIX = "player:name_"; // 玩家 ID → 名字映射�
 
 // --- 大厅悬浮排行榜 ---
 export const LEADERBOARD_DISPLAY_PREFIX = "leaderboard:display_"; // 各分类位置 JSON：{x,y,z,scale}
-export const LEADERBOARD_DISPLAY_COUNT = 10; // 悬浮榜显示条数
+export const LEADERBOARD_DISPLAY_COUNT = 20; // 悬浮榜显示条数
 
 // --- 悬浮公告 ---
 export const NOTICE_LIST_KEY = "notice:list"; // 公告列表 JSON

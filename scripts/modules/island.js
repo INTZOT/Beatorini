@@ -230,7 +230,7 @@ export function handleLobby(player) {
   system.runTimeout(() => {
     try {
       const lobby = world.getDimension(LOBBY_DIMENSION_ID);
-      teleportPlayer(player, { x: 0, y: 64, z: 0 }, { dimension: lobby });
+      teleportPlayer(player, { x: 0.5, y: 64, z: 0.5 }, { dimension: lobby });
     } catch (e) {
       console.error(`[Lobby] Teleport failed: ${e}`);
       player.sendMessage("§c传送至大厅失败，请重试");
@@ -519,7 +519,7 @@ function abandonIsland(player, islandIndex) {
     if (p.dimension.id !== dimensionId) continue;
     if (members.includes(p.id)) continue;
     try {
-      p.teleport({ x: 0, y: 64, z: 0 }, { dimension: lobby });
+      p.teleport({ x: 0.5, y: 64, z: 0.5 }, { dimension: lobby });
       p.removeTag("visitor");
       p.addTag("member");
       p.sendMessage("§c你访问的岛屿已被放弃，已传送回大厅");
@@ -542,11 +542,11 @@ function abandonIsland(player, islandIndex) {
       try {
         onlineMember.getComponent("minecraft:inventory").container.clearAll();
       } catch (e) {}
-      onlineMember.setSpawnPoint({ dimension: lobby, x: 0, y: 64, z: 0 });
+      onlineMember.setSpawnPoint({ dimension: lobby, x: 0.5, y: 64, z: 0.5 });
       if (onlineMember.dimension.id === dimensionId) {
         try {
           onlineMember.teleport(
-            { x: 0, y: 64, z: 0 },
+            { x: 0.5, y: 64, z: 0.5 },
             { dimension: lobby }
           );
         } catch (e) {
@@ -607,8 +607,8 @@ function leaveIsland(player) {
         player.getComponent("minecraft:inventory").container.clearAll();
       } catch (e) {}
       const lobby = world.getDimension(LOBBY_DIMENSION_ID);
-      player.setSpawnPoint({ dimension: lobby, x: 0, y: 64, z: 0 });
-      player.teleport({ x: 0, y: 64, z: 0 }, { dimension: lobby });
+      player.setSpawnPoint({ dimension: lobby, x: 0.5, y: 64, z: 0.5 });
+      player.teleport({ x: 0.5, y: 64, z: 0.5 }, { dimension: lobby });
       giveMenuClock(player);
       try {
         player.removeTag("visitor");
@@ -803,8 +803,8 @@ function confirmKickMember(player, islandIndex, targetId, backFn) {
         giveMenuClock(target);
         try {
           const lobby = world.getDimension(LOBBY_DIMENSION_ID);
-          target.setSpawnPoint({ dimension: lobby, x: 0, y: 64, z: 0 });
-          target.teleport({ x: 0, y: 64, z: 0 }, { dimension: lobby });
+          target.setSpawnPoint({ dimension: lobby, x: 0.5, y: 64, z: 0.5 });
+          target.teleport({ x: 0.5, y: 64, z: 0.5 }, { dimension: lobby });
         } catch (e) {
           console.error(`[Kick] Teleport failed: ${e}`);
         }
