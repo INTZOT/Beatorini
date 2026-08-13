@@ -257,6 +257,15 @@ const TREASURE_REWARDS = [
   ["minecraft:silence_armor_trim_smithing_template", "幽静纹盔甲纹饰", "rare", 1],
   ["minecraft:heavy_core", "沉重核心", "legendary", 1],
   ["minecraft:mace", "重锤", "legendary", 1],
+  // --- 鹦鹉螺铠 / 马铠（按材质品质） ---
+  ["minecraft:copper_nautilus_armor", "铜鹦鹉螺铠", "common", 1],
+  ["minecraft:iron_nautilus_armor", "铁鹦鹉螺铠", "rare", 1],
+  ["minecraft:golden_nautilus_armor", "金鹦鹉螺铠", "epic", 1],
+  ["minecraft:diamond_nautilus_armor", "钻石鹦鹉螺铠", "legendary", 1],
+  ["minecraft:copper_horse_armor", "铜马铠", "common", 1],
+  ["minecraft:iron_horse_armor", "铁马铠", "rare", 1],
+  ["minecraft:golden_horse_armor", "金马铠", "epic", 1],
+  ["minecraft:diamond_horse_armor", "钻石马铠", "legendary", 1],
 ];
 
 // --- 奖池列表（后续新增奖池直接在此追加） ---
