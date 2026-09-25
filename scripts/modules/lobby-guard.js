@@ -34,7 +34,17 @@ export function init() {
   // 阻止主世界生成实体（白名单放行）：同时拦截自然流浪商人/物品掉落等
   world.afterEvents.entitySpawn.subscribe((event) => {
     const ent = event.entity;
-    if (!ent || ent.dimension?.id !== LOBBY_DIMENSION_ID) return;
+    // 注意：event.entity 可能在回调执行前就已失效（例如结构加载、其它订阅者
+    // 先一步 remove 掉它）。此时读取 .dimension 会抛 InvalidEntityError 并刷屏。
+    // 所以必须先校验 isValid，再用 try/catch 兜住残余竞态。
+    if (!ent || !ent.isValid) return;
+    let dimId;
+    try {
+      dimId = ent.dimension?.id;
+    } catch (e) {
+      return;
+    }
+    if (dimId !== LOBBY_DIMENSION_ID) return;
     if (ENTITY_SPAWN_WHITELIST.has(ent.typeId)) return;
     try {
       ent.remove();
