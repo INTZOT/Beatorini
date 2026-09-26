@@ -14,6 +14,9 @@ import { SERVER_CLOCK_ID, CLOCK_MARKERS } from "./config.js";
 
 const handlers = new Map(); // markerName -> Set<handler>
 let ready = false;
+let operational = false;
+let paused = false;
+let missingMarkers = new Set();
 let lastError = "";
 
 /** 订阅某个 time marker 的触发（同一 handler 重复订阅会去重） */
@@ -27,9 +30,25 @@ export function onMarker(markerName, handler) {
   set.add(handler);
 }
 
-/** 时钟是否可用（世界加载完成后才有结论，不要在 init 阶段判断） */
+/** 时钟对象是否取到（世界加载完成后才有结论，不要在 init 阶段判断） */
 export function isClockReady() {
   return ready;
+}
+
+/**
+ * 时钟是否**真的会按时刻表触发 marker**。
+ * ready 只代表"时钟对象存在"，但下列任一情况都会让 marker 永不触发：
+ *   - 时钟被暂停（isPaused）
+ *   - marker 缺失（补建失败）
+ * 因此依赖时钟调度的功能（如流浪商人）必须用本函数决定是否启用兜底。
+ */
+export function isClockOperational() {
+  return operational;
+}
+
+/** 最近一次判定出来的不可用原因（便于日志与排查） */
+export function getClockStatus() {
+  return { ready, operational, paused, missingMarkers: [...missingMarkers], lastError };
 }
 
 /** 取自定义时钟对象；不可用时返回 undefined */
@@ -99,6 +118,7 @@ function verifyAndSync() {
   const clock = getServerClock();
   if (!clock) {
     ready = false;
+    operational = false;
     console.warn(
       `[Clock] ${SERVER_CLOCK_ID} 不可用，使用方应回退到轮询` +
         (lastError ? `（${lastError}）` : "")
@@ -120,9 +140,49 @@ function verifyAndSync() {
     console.warn(`[Clock] 检查/补建 time marker 失败：${e}`);
   }
 
+  // --- 可用性判定：对象存在 ≠ marker 会触发 ---
+  try {
+    paused = clock.isPaused === true;
+  } catch (e) {
+    paused = false;
+  }
+  missingMarkers = new Set();
+  try {
+    const names = new Set((clock.timeMarkers ?? []).map((m) => m.name));
+    for (const marker of CLOCK_MARKERS) {
+      if (!names.has(marker.name)) missingMarkers.add(marker.name);
+    }
+  } catch (e) {
+    for (const marker of CLOCK_MARKERS) missingMarkers.add(marker.name);
+  }
+  operational = !paused && missingMarkers.size === 0;
+  if (!operational) {
+    console.warn(
+      `[Clock] ⚠ ${SERVER_CLOCK_ID} 存在但不会触发 marker（paused=${paused}，缺失 marker=${
+        [...missingMarkers].join(",") || "无"
+      }）→ 依赖它的功能必须走兜底`
+    );
+  }
+
   const timeOfDay = world.getTimeOfDay();
   try {
-    clock.time = timeOfDay;
+    // 幂等对齐：只有偏差较大时才回拨。
+    // 给 clock.time 赋值本身就会被算作"时间被修改"（可能触发 marker 事件），
+    // 每次世界加载都无脑回拨会造成 marker 相位漂移、甚至多触发一波。
+    const current = clock.time;
+    if (Number.isFinite(current)) {
+      const currentOfDay = ((current % 24000) + 24000) % 24000;
+      const raw = Math.abs(currentOfDay - timeOfDay);
+      const drift = Math.min(raw, 24000 - raw);
+      if (drift > 200) {
+        clock.time = timeOfDay;
+        console.warn(`[Clock] 时钟与游戏时刻偏差 ${drift} tick，已对齐到 ${timeOfDay}`);
+      } else {
+        console.warn(`[Clock] 时钟已对齐（偏差 ${drift} tick），跳过回拨`);
+      }
+    } else {
+      clock.time = timeOfDay;
+    }
   } catch (e) {
     console.warn(`[Clock] 时间对齐失败（沿用时钟自身时间）：${e}`);
   }

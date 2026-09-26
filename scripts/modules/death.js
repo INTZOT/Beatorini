@@ -26,6 +26,8 @@ export function init() {
         obj.setScore(dead, net - actual);
         dead.sendMessage(`§c你因死亡损失了 ${actual} 金币（净资产 ${net}）`);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn(`[Death] 死亡惩罚结算失败（${dead?.name ?? "?"}）：${e}`);
+    }
   });
 }

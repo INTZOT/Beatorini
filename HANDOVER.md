@@ -120,16 +120,24 @@
      - `island.js` 已同步：边界扩展 x/z 用 `ISLAND_BOUNDARY_LIMIT`(256)、y 用 `ISLAND_BOUNDARY_LIMIT_Y`(512)；重置 clamp 用 `ISLAND_DIMENSION_MIN_Y`/`MAX_Y`
      - ⚠️ 别在生产世界做**收缩**高度的实验：早期测试把高度压到 0..32 后，那批超范围方块在后续几次启动后消失（扩大范围则实测安全，上线动作已模拟验证）
    - `generator_type` 目前只支持 `void`（做不出有地形的维度）
-9. **版本发布流程**：每次发版同步三份日志：
+9. **静默失败防护约定（4.13.5 起，务必保持）**
+   - `main.js` 的 `MODULES` 表逐个 init 并 try/catch：任何模块抛错只影响自己，失败会打 `[Boot] FAILED <模块>`；**不要退回裸顺序调用**（否则一个模块出错会让其后所有模块静默不初始化）
+   - `lib/async.js` 的 `withTimeout()`：所有"可能长时间不 resolve"的原生 Promise（`tickingAreaManager.createTickingArea` 等）await 时必须包超时，否则会静默卡死
+   - `lib/json.js` 的 `safeParseArray/safeParseObject`：动态属性 JSON 一律走它，坏数据不能让事件/表单回调抛穿
+   - `lib/form.js` 的 `notifyIfBusy()` / `validIndex()`：`form.show()` 必须处理 `UserBusy`（resolve 而非 reject）；客户端可写的 Observable 下标必须校验
+   - 金库就绪：`vault.js` 用 `TickingArea.isFullyLoaded` 判定区块是否真的加载完成，**未加载完成时绝不调用 `ensureVaultEntities()`**（会清索引 + 补空实体 → 市场对账误判全服商品丢失）；完成后写 `market:vault_ready_at`，`market.js` 要求时间戳 ≥ 本次启动才允许对账
+   - 高度：`ISLAND_BUILD_MAX_Y = 511`（512 是只读边界层，`/fill` 到 512 会整段失败）；边界判据用区间 `y < MIN_Y || y > BUILD_MAX_Y`，不要用 `Math.abs(y)` 比较
+   - 资金流：改钱一律用校验过 `successCount` 的封装（market 的 `changeMoney`、lottery 的 `deductMoney/refundMoney`），**先付后记**，失败不清队列、不落库
+   - `world.tickingAreaManager` 的 chunk 预算是**按包共享**的（实测上限 300）：新增常加载区域前先 `hasCapacity()`
+10. **版本发布流程**：每次发版同步三份日志：：每次发版同步三份日志：
    - `CHANGELOG.md`（完整）
    - `simple_changelog.md`（QQ 公告版，无 §；另附 `\n` 换行的「游戏公告复制版」）
    - `scripts/modules/signin.js` 的 `SERVER_CHANGELOGS[0]`（游戏内，带 §，只保留最新版本）
 
 ## 7. 当前状态与待办
 
-- **当前版本 4.13.0**（2026-09-25，三份日志已同步；工作区改动见 `git status`，尚未提交）
-  - 内容：空岛建筑上限 320 → 512、世界时钟接管流浪商人、公告/排行榜行距、lobby-guard 修复
-  - 4.12.2（市场货不对板修复）此前只写了 `CHANGELOG.md`，本次一并补进 `simple_changelog.md`
+- **当前版本 4.13.5**（2026-09-26）：P0×6 静默失败根治（含 `main.js` 错误边界、金库/市场数据安全、时钟兜底看门狗、表单 UserBusy）+ 岛屿高度上界 511 修复 + 资金流校验 + 批 2/3 修复；完整清单见 `CODE_REVIEW-2026-09-26.md`
+  - 4.13.5 未同步三份玩家日志（按热修惯例）；若要发给玩家再做一次发版同步
 - 最新提交 `459c180`（lobby-guard 失效实体修复，非发版提交）
 - 无未完成的重构；BetterTextDisplay 为独立测试包（新存档测试 `/btd`）
 - 本地测试服（**可无头实测行为包**，2026-09-25 起可用）：见 `tools/local-server/README.md`

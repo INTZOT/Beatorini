@@ -3,6 +3,7 @@
 // 公告存动态属性，世界加载后自动重建
 // 多行公告用单个 TextPrimitive + 真换行，行距交给 lineGapHeight
 // ============================================================
+import { notifyIfBusy, validIndex } from "../lib/form.js";
 import { system, world, TextPrimitive } from "@minecraft/server";
 import {
   CustomForm,
@@ -59,7 +60,14 @@ function clearShapes(id) {
 
 function renderNotice(entry) {
   clearShapes(entry.id);
-  const lobby = world.getDimension(LOBBY_DIMENSION_ID);
+  // getDimension 必须在 try 内：它在外面抛错会中断整个重建循环（整批公告静默消失）
+  let lobby;
+  try {
+    lobby = world.getDimension(LOBBY_DIMENSION_ID);
+  } catch (e) {
+    console.error(`[Notice] 取大厅维度失败，公告 #${entry.id} 未渲染：${e}`);
+    return;
+  }
   // 兼容字面 \n（从输入框粘贴的复制版）与真实换行
   const text = String(entry.text || "").replace(/\\n/g, "\n");
   const color = {
@@ -93,7 +101,18 @@ function renderNotice(entry) {
 
 function renderAllNotices() {
   for (const id of [...noticeShapes.keys()]) clearShapes(id);
-  for (const notice of getNotices()) renderNotice(notice);
+  const notices = getNotices();
+  let ok = 0;
+  for (const notice of notices) {
+    // 逐条兜底：单条失败不影响其余公告
+    try {
+      renderNotice(notice);
+      ok++;
+    } catch (e) {
+      console.error(`[Notice] 公告 #${notice?.id} 渲染异常：${e}`);
+    }
+  }
+  console.warn(`[Notice] 重建完成：成功 ${ok}/${notices.length} 条`);
 }
 
 export function init() {
@@ -113,7 +132,7 @@ export function showNoticeAdminMenu(player, backFn = () => {}) {
   form.spacer();
 
   const items = notices.map((n, i) => ({
-    label: `#${n.id}  ${n.text}  (${Math.round(n.x)}, ${Math.round(n.y)}, ${Math.round(n.z)})`,
+    label: `#${n.id}  ${String(n.text ?? "").slice(0, 24).replace(/\n/g, "⏎")}  (${Math.round(n.x)}, ${Math.round(n.y)}, ${Math.round(n.z)})`,
     value: i,
   }));
   items.push({ label: "＋ 新建公告", value: notices.length });
@@ -122,7 +141,12 @@ export function showNoticeAdminMenu(player, backFn = () => {}) {
   form.dropdown("选择公告", selected, items);
   form.spacer();
   form.button("编辑", () => {
-    const idx = selected.getData();
+    // "新建"项的下标恰好等于 notices.length，所以上界放到 length（含）
+    const idx = validIndex(selected.getData(), notices.length + 1);
+    if (idx === undefined) {
+      player.sendMessage("§c选择无效，请重试");
+      return;
+    }
     form.close();
     if (idx >= notices.length) {
       system.runTimeout(() => showNoticeEditor(player, null, backFn), 2);
@@ -132,8 +156,8 @@ export function showNoticeAdminMenu(player, backFn = () => {}) {
   });
   form.spacer();
   form.button("删除", () => {
-    const idx = selected.getData();
-    if (idx >= notices.length) {
+    const idx = validIndex(selected.getData(), notices.length);
+    if (idx === undefined) {
       player.sendMessage("§c请先选择要删除的公告");
       return;
     }
@@ -151,7 +175,7 @@ export function showNoticeAdminMenu(player, backFn = () => {}) {
     form.close();
     system.runTimeout(() => backFn(player), 2);
   });
-  form.show().catch((e) => console.warn("Notice admin form failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Notice admin form failed:", e));
 }
 
 function showNoticeEditor(player, notice, backFn) {
@@ -235,6 +259,21 @@ function showNoticeEditor(player, notice, backFn) {
     .spacer()
     .button("保存", () => {
       const text = textObs.getData().trim();
+      // TextPrimitive 硬上限：128 行 × 每行 128 字符（超限会在渲染时抛错，
+      // 而公告已经落盘 → 每次开机都失败、管理面板却提示"已保存"）
+      const lines = text.replace(/\\n/g, "\n").split("\n");
+      const tooManyLines = lines.length > 128;
+      const tooLongLine = lines.findIndex((l) => l.length > 128);
+      if (tooManyLines || tooLongLine >= 0) {
+        player.sendMessage(
+          tooManyLines
+            ? `§c公告最多 128 行（当前 ${lines.length} 行）`
+            : `§c第 ${tooLongLine + 1} 行超过 128 字符（当前 ${lines[tooLongLine].length}）`
+        );
+        form.close();
+        system.runTimeout(() => showNoticeEditor(player, notice, backFn), 2);
+        return;
+      }
       if (!text) {
         player.sendMessage("§c公告内容不能为空");
         form.close();
@@ -295,5 +334,5 @@ function showNoticeEditor(player, notice, backFn) {
       system.runTimeout(() => showNoticeAdminMenu(player, backFn), 2);
     });
 
-  form.show().catch((e) => console.warn("Notice editor form failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Notice editor form failed:", e));
 }

@@ -9,7 +9,13 @@
  * @param {any} dimOrOptions - 目标维度或 teleport 选项
  */
 export function teleportPlayer(player, pos, dimOrOptions) {
-  if (dimOrOptions?.dimension) {
+  // 兼容"直接传 Dimension"的调用（Dimension 只有 .id 没有 .dimension，
+  // 旧实现会把跨维度传送静默降级成当前维度内传送）
+  const options =
+    dimOrOptions && typeof dimOrOptions.id === "string" && !dimOrOptions.dimension
+      ? { dimension: dimOrOptions }
+      : dimOrOptions;
+  if (options?.dimension) {
     player.teleport(pos, dimOrOptions);
   } else {
     player.teleport(pos);

@@ -11,6 +11,7 @@
 //   缺失/损坏的实体动态属性只作为迁移来源，绝不回退到 0。
 // ============================================================
 import { system, world, ItemStack } from "@minecraft/server";
+import { withTimeout } from "../lib/async.js";
 import {
   MARKET_VAULT_DIM_ID,
   MARKET_VAULT_ENTITY_ID,
@@ -25,6 +26,8 @@ import {
   MARKET_VAULT_INDEX_KEY,
   MARKET_VAULT_INDEX_MAP_KEY,
   MARKET_VAULT_TICKINGAREA,
+  MARKET_VAULT_LEGACY_TICKINGAREA,
+  MARKET_VAULT_READY_KEY,
 } from "./config.js";
 
 export function getVaultCount() {
@@ -359,29 +362,11 @@ export function init() {
 }
 
 /**
- * 给 Promise 加 tick 级超时。
+ * 给 Promise 加 tick 级超时（统一实现在 lib/async.js）。
  * 线上曾出现金库初始化「零日志」卡死：`createTickingArea` 的 await 长时间不 resolve，
  * setupVault 既不往下走也不抛错 → ensureVaultEntities 永不执行 → 市场永远拿不到金库实体。
  * 加超时后这种情况会以明确错误暴露（并走 setupVault 的重试 / Init failed 日志），不再静默。
  */
-async function withTimeout(promise, ticks, label) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = system.runTimeout(() => {
-      reject(new Error(`${label} 超过 ${ticks} tick 未完成`));
-    }, ticks);
-  });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timer !== undefined) {
-      try {
-        system.clearRun(timer);
-      } catch (e) {}
-    }
-  }
-}
-
 async function setupVault(retry = 0) {
   try {
     const dim = getVaultDimension();
@@ -398,6 +383,33 @@ async function setupVault(retry = 0) {
       },
     };
 
+    // 旧名记录（更名前的 beatorini_market_vault）在部分存档里会残留成"僵尸区域"：
+    // hasTickingArea() 恒 true 但它并不真的常载区块。这里尽力清理，避免继续占预算。
+    try {
+      if (manager.hasTickingArea(MARKET_VAULT_LEGACY_TICKINGAREA)) {
+        manager.removeTickingArea(MARKET_VAULT_LEGACY_TICKINGAREA);
+        console.warn(
+          `[Vault] 已清理旧的 ticking area 记录（${MARKET_VAULT_LEGACY_TICKINGAREA}）`
+        );
+      }
+    } catch (e) {
+      console.warn(`[Vault] 清理旧 ticking area 失败（忽略）：${e}`);
+    }
+
+    // 关键：不能只信 hasTickingArea() —— 陈旧记录会让它恒为 true，但区块并未常载。
+    // 用 TickingArea.isFullyLoaded（"所有 ticking 区块已加载"）判定，不满足就删除重建。
+    const existingArea = getVaultArea();
+    if (existingArea && !existingArea.isFullyLoaded) {
+      console.warn(
+        "[Vault] ticking area 存在但未完全加载（isFullyLoaded=false），删除后重建"
+      );
+      try {
+        manager.removeTickingArea(existingArea);
+      } catch (e) {
+        console.warn(`[Vault] 删除未加载完成的 ticking area 失败：${e}`);
+      }
+    }
+
     // 用 ScriptAPI 的 TickingAreaManager（按包预算，不占用原版命令的 10 个名额）
     if (!manager.hasTickingArea(MARKET_VAULT_TICKINGAREA)) {
       if (!manager.hasCapacity(options)) {
@@ -411,10 +423,12 @@ async function setupVault(retry = 0) {
         100,
         `createTickingArea(${MARKET_VAULT_TICKINGAREA})`
       );
-      console.warn(
-        `[Vault] Ticking area 就绪（${manager.chunkCount}/${manager.maxChunkCount} chunks）`
-      );
     }
+
+    console.warn(
+      `[Vault] Ticking area 就绪（${manager.chunkCount}/${manager.maxChunkCount} chunks，` +
+        `isFullyLoaded=${getVaultArea()?.isFullyLoaded === true}）`
+    );
 
     // 等待区块与实体加载后再确保/创建实体，
     // 避免把“暂未加载”误判为“实体缺失”而重复生成空实体
@@ -430,6 +444,20 @@ async function setupVault(retry = 0) {
   }
 }
 
+/** 取金库 ticking area（取不到返回 undefined，绝不抛错） */
+function getVaultArea() {
+  try {
+    return world.tickingAreaManager.getTickingArea(MARKET_VAULT_TICKINGAREA);
+  } catch (e) {
+    return undefined;
+  }
+}
+
+/** ticking area 是否真的把所有区块加载完成 —— 僵尸记录会让 hasTickingArea() 恒 true，不可信 */
+function vaultChunksLoaded() {
+  return getVaultArea()?.isFullyLoaded === true;
+}
+
 /** 等待金库实体加载完成后再执行 ensureVaultEntities */
 function ensureVaultEntitiesAfterLoad(attempt) {
   // 注意：这里是 runTimeout 递归链，抛出的异常不会被 setupVault 的 catch 捕获，
@@ -437,20 +465,43 @@ function ensureVaultEntitiesAfterLoad(attempt) {
   try {
     const expected = getVaultCount();
     const found = getVaultEntities().length;
-    if (expected > 0 && found < expected && attempt < 20) {
+    const loaded = vaultChunksLoaded();
+
+    // 没数齐 + 区块还没加载完 → 继续等，期间绝不动索引映射
+    if (expected > 0 && found < expected && !loaded && attempt < 40) {
       system.runTimeout(() => ensureVaultEntitiesAfterLoad(attempt + 1), 10);
       return;
     }
+
+    // 等不到了：宁可不重建，也不能把"没加载出来"误判成"实体已丢失"。
+    // ensureVaultEntities() 会删除悬空索引并补建空容器实体，一旦误判：
+    // 数量立刻"达标" → 市场对账逐槽比对全空 → 全服在售清单被隔离（物品无法自动找回）。
+    if (expected > 0 && found < expected && !loaded) {
+      console.error(
+        `[Vault] 区块始终未加载完成（${found}/${expected}，attempt=${attempt}），` +
+          `已跳过实体重建以免误删索引映射；市场对账将保持跳过（不会误下架商品）`
+      );
+      return;
+    }
+
     const entities = ensureVaultEntities();
     const mapCount = Object.keys(getVaultIndexMap()).length;
+
+    // 就绪代数：market.js 的启动对账必须看到本次启动写入的新时间戳才允许执行
+    try {
+      world.setDynamicProperty(MARKET_VAULT_READY_KEY, Date.now());
+    } catch (e) {
+      console.error(`[Vault] 写入就绪时间戳失败：${e}`);
+    }
+
     console.warn(
-      `[Vault] 金库就绪：${entities.length} 个实体，${entities.length * MARKET_VAULT_SLOTS} 个槽位（索引映射 ${mapCount} 条）`
+      `[Vault] 金库就绪：${entities.length} 个实体，${entities.length * MARKET_VAULT_SLOTS} 个槽位（索引映射 ${mapCount} 条，区块已加载=${loaded}）`
     );
   } catch (e) {
     console.error(
-      `[Vault] 实体检查失败（attempt=${attempt}/${20}）：${e}`
+      `[Vault] 实体检查失败（attempt=${attempt}/40）：${e}`
     );
-    if (attempt < 20) {
+    if (attempt < 40) {
       system.runTimeout(() => ensureVaultEntitiesAfterLoad(attempt + 1), 20);
     } else {
       console.error("[Vault] 实体检查连续失败，金库可能不可用");

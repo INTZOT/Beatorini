@@ -1,3 +1,4 @@
+import { notifyIfBusy, validIndex } from "../lib/form.js";
 import { world, system, TextPrimitive } from "@minecraft/server";
 import {
   CustomForm,
@@ -67,7 +68,7 @@ function showLeaderboard(player, category, backFn) {
     form.close();
     system.runTimeout(() => showLeaderboardMenu(player, backFn), 2);
   });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 export function showLeaderboardMenu(player, backFn) {
@@ -87,7 +88,7 @@ export function showLeaderboardMenu(player, backFn) {
     form.close();
     system.runTimeout(() => backFn(player), 2);
   });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // ============================================================
@@ -188,11 +189,17 @@ function renderBoard(categoryKey) {
   const category = categoryByKey(categoryKey);
   if (!cfg || !category) return;
 
-  const lobby = world.getDimension(LOBBY_DIMENSION_ID);
-  const entries = collectCategoryEntries(category).slice(
-    0,
-    LEADERBOARD_DISPLAY_COUNT
-  );
+  // getDimension / 数据收集都可能在异常环境下抛错，必须在 try 内，
+  // 否则整个重建循环中断、所有悬浮榜静默消失
+  let lobby;
+  let entries;
+  try {
+    lobby = world.getDimension(LOBBY_DIMENSION_ID);
+    entries = collectCategoryEntries(category).slice(0, LEADERBOARD_DISPLAY_COUNT);
+  } catch (e) {
+    console.error(`[Leaderboard] 准备数据失败 ${categoryKey}：${e}`);
+    return;
+  }
   try {
     const shape = new TextPrimitive(
       { x: cfg.x, y: cfg.y, z: cfg.z, dimension: lobby },
@@ -235,18 +242,36 @@ function refreshBoard(categoryKey) {
   }
   try {
     board.shapes[0].setText(buildBoardText(category, entries, cfg.colorIndex));
-  } catch (e) {}
+  } catch (e) {
+    // 刷新失败要么记录、要么重建：旧写法空 catch → 悬浮榜永久冻结在旧数据且无日志
+    console.warn(`[Leaderboard] 刷新失败 ${categoryKey}：${e}，尝试重建`);
+    clearCategoryShapes(categoryKey);
+    renderBoard(categoryKey);
+  }
 }
 
 export function init() {
   world.afterEvents.worldLoad.subscribe(() => {
     system.runTimeout(() => {
-      for (const cat of STATS_CATEGORIES) renderBoard(cat.key);
+      let ok = 0;
+      for (const cat of STATS_CATEGORIES) {
+        try {
+          renderBoard(cat.key);
+          ok++;
+        } catch (e) {
+          console.error(`[Leaderboard] 重建失败 ${cat.key}：${e}`);
+        }
+      }
+      console.warn(`[Leaderboard] 重建完成：成功 ${ok}/${STATS_CATEGORIES.length} 个分类`);
     }, 20);
   });
-  // 每 3 秒实时刷新悬浮榜
+  // 每 3 秒实时刷新悬浮榜（整体兜底，避免一次异常让定时器静默停摆）
   system.runInterval(() => {
-    for (const cat of STATS_CATEGORIES) refreshBoard(cat.key);
+    try {
+      for (const cat of STATS_CATEGORIES) refreshBoard(cat.key);
+    } catch (e) {
+      console.warn(`[Leaderboard] 刷新循环异常（本次跳过）：${e}`);
+    }
   }, 60);
 }
 
@@ -267,13 +292,23 @@ export function showLeaderboardAdminMenu(player, backFn = () => {}) {
   form.dropdown("排行榜", selected, items);
   form.spacer();
   form.button("编辑设置", () => {
-    const cat = STATS_CATEGORIES[selected.getData()];
+    const idx = validIndex(selected.getData(), STATS_CATEGORIES.length);
+    if (idx === undefined) {
+      player.sendMessage("§c选择无效，请重试");
+      return;
+    }
+    const cat = STATS_CATEGORIES[idx];
     form.close();
     system.runTimeout(() => showLeaderboardEditor(player, cat, backFn), 2);
   });
   form.spacer();
   form.button("清除位置（隐藏）", () => {
-    const cat = STATS_CATEGORIES[selected.getData()];
+    const idx = validIndex(selected.getData(), STATS_CATEGORIES.length);
+    if (idx === undefined) {
+      player.sendMessage("§c选择无效，请重试");
+      return;
+    }
+    const cat = STATS_CATEGORIES[idx];
     if (getBoardConfig(cat.key)) {
       clearBoardConfig(cat.key);
       player.sendMessage(`§a已隐藏「${cat.name}」排行榜`);
@@ -288,7 +323,7 @@ export function showLeaderboardAdminMenu(player, backFn = () => {}) {
     form.close();
     system.runTimeout(() => backFn(player), 2);
   });
-  form.show().catch((e) => console.warn("Leaderboard admin form failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Leaderboard admin form failed:", e));
 }
 
 function showLeaderboardEditor(player, category, backFn) {
@@ -415,5 +450,5 @@ function showLeaderboardEditor(player, category, backFn) {
       system.runTimeout(() => showLeaderboardAdminMenu(player, backFn), 2);
     });
 
-  form.show().catch((e) => console.warn("Leaderboard editor form failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Leaderboard editor form failed:", e));
 }

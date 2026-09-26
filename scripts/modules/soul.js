@@ -71,39 +71,78 @@ function enterSoul(player) {
 function exitSoul(player, reason) {
   const markerId = world.getDynamicProperty(SOUL_KEY + player.id);
   if (!markerId) return;
-  world.setDynamicProperty(SOUL_KEY + player.id, undefined);
 
   const data = active.get(player.id);
   let originalMode = data?.originalMode;
   if (!originalMode) {
-    const current = String(player.getGameMode()).toLowerCase();
-    originalMode = current === "spectator" ? "survival" : current;
+    try {
+      const current = String(player.getGameMode()).toLowerCase();
+      originalMode = current === "spectator" ? "survival" : current;
+    } catch (e) {
+      console.warn(`[Soul] 读取游戏模式失败，按 survival 恢复：${e}`);
+      originalMode = "survival";
+    }
   }
-  active.delete(player.id);
 
-  const marker = world.getEntity(markerId);
+  // 顺序很重要：旧的写法一进来就清掉 soul:active_<id>（唯一的持久状态），
+  // 之后 teleport / gamemode 任一步抛错 → 状态已丢、标记未删、模式未恢复，
+  // 玩家永久卡在旁观者且无日志。现在改为：能恢复多少先恢复，全成功后再清状态。
+  let restored = true;
+
+  const marker = (() => {
+    try {
+      return world.getEntity(markerId);
+    } catch (e) {
+      return undefined;
+    }
+  })();
+
   if (data?.bodyPos) {
-    // 优先传回进入出窍时的精确坐标
     try {
       player.teleport(data.bodyPos, {
         dimension: world.getDimension(data.dimensionId),
       });
-    } catch (e) {}
+    } catch (e) {
+      restored = false;
+      console.error(`[Soul] 传送回本体失败（${player.name ?? player.id}）：${e}`);
+    }
   } else if (marker) {
-    // 无记录时退回标记位置
     try {
       player.teleport(marker.location, { dimension: marker.dimension });
-    } catch (e) {}
+    } catch (e) {
+      restored = false;
+      console.error(`[Soul] 传送到标记失败（${player.name ?? player.id}）：${e}`);
+    }
   }
-  try {
-    marker?.remove();
-  } catch (e) {}
 
   try {
-    player.runCommand(`gamemode ${originalMode} @s`);
-  } catch (e) {}
-  player.sendMessage(`§e已退出灵魂出窍（${reason}）`);
-  player.playSound("random.orb");
+    marker?.remove();
+  } catch (e) {
+    console.warn(`[Soul] 移除出窍标记失败（忽略）：${e}`);
+  }
+
+  try {
+    const res = player.runCommand(`gamemode ${originalMode} @s`);
+    if ((res?.successCount ?? 0) < 1) {
+      restored = false;
+      console.error(`[Soul] 恢复游戏模式未生效（${player.name ?? player.id} → ${originalMode}）`);
+    }
+  } catch (e) {
+    restored = false;
+    console.error(`[Soul] 恢复游戏模式抛错（${player.name ?? player.id}）：${e}`);
+  }
+
+  if (restored) {
+    // 只有确实恢复成功才清状态；否则保留，玩家可用 /fc off 再试一次
+    world.setDynamicProperty(SOUL_KEY + player.id, undefined);
+    active.delete(player.id);
+    player.sendMessage(`§e已退出灵魂出窍（${reason}）`);
+    player.playSound("random.orb");
+  } else {
+    player.sendMessage(
+      "§c退出灵魂出窍时有步骤失败（已保留状态），请再执行一次 /fc off 或联系管理员"
+    );
+  }
 }
 
 function restoreAfterReload(player) {
@@ -151,9 +190,19 @@ export function init() {
   });
 
   // 玩家重连恢复（离线期间标记保留在存档中）
-  world.afterEvents.playerJoin.subscribe((event) => {
+  // 注意：PlayerJoinAfterEvent 只有 playerId/playerName，**没有 player 字段**，
+  // 旧写法 event.player 恒为 undefined → restoreAfterReload 永久早退，重连恢复是死代码。
+  // 改用 playerSpawn（带 event.player），并延时等实体可用。
+  world.afterEvents.playerSpawn.subscribe((event) => {
     const p = event.player;
-    system.runTimeout(() => restoreAfterReload(p), 10);
+    if (!p) return;
+    system.runTimeout(() => {
+      try {
+        restoreAfterReload(p);
+      } catch (e) {
+        console.warn(`[Soul] 重连恢复失败（${p.name ?? p.id}）：${e}`);
+      }
+    }, 10);
   });
 
 }

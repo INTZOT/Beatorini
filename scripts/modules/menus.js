@@ -1,5 +1,7 @@
+import { notifyIfBusy } from "../lib/form.js";
 import { system, world, ItemStack, EntityInitializationCause, CommandPermissionLevel, CustomCommandParamType, CustomCommandStatus } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
+import { safeParseArray } from "../lib/json.js";
 import { getPlayerMoney } from "./money.js";
 import { getPlayerTitle, showTitleMenu } from "./title.js";
 import {
@@ -71,7 +73,7 @@ function showIslandMenu(player) {
       2
     );
   });
-  f.show().catch((e) => console.warn("Form show failed:", e));
+  f.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // ============================================================
@@ -103,7 +105,7 @@ function showGrowthMenu(player) {
     f.close();
     system.runTimeout(() => showIslandMenu(player), 2);
   });
-  f.show().catch((e) => console.warn("Form show failed:", e));
+  f.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // ============================================================
@@ -135,7 +137,7 @@ function showAchievementsMenu(player, backFn) {
       system.runTimeout(() => backFn(player), 2);
     });
 
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // ============================================================
@@ -183,7 +185,7 @@ function showTradeSubMenu(player) {
     f.close();
     system.runTimeout(() => showIslandMenu(player), 2);
   });
-  f.show().catch((e) => console.warn("Trade sub-menu failed:", e));
+  f.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Trade sub-menu failed:", e));
 }
 
 // ============================================================
@@ -264,7 +266,7 @@ function showTransferMoneyForm(player) {
       form.close();
       system.runTimeout(() => showTradeSubMenu(player), 2);
     });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, p)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // ============================================================
@@ -543,16 +545,18 @@ export function init() {
           now - n.timestamp > 60000
         ) {
           if (n.type === "visit") {
-            const reqs = JSON.parse(
-              world.getDynamicProperty("island:visit_req_" + i) || "[]"
+            const reqs = safeParseArray(
+              world.getDynamicProperty("island:visit_req_" + i),
+              "island:visit_req_" + i
             );
             world.setDynamicProperty(
               "island:visit_req_" + i,
               JSON.stringify(reqs.filter((r) => r.playerId !== n.playerId))
             );
           } else {
-            const reqs = JSON.parse(
-              world.getDynamicProperty("island:join_req_" + i) || "[]"
+            const reqs = safeParseArray(
+              world.getDynamicProperty("island:join_req_" + i),
+              "island:join_req_" + i
             );
             world.setDynamicProperty(
               "island:join_req_" + i,
@@ -586,7 +590,6 @@ export function init() {
 
   world.afterEvents.playerSpawn.subscribe((event) => {
     const player = event.player;
-    const spawnDim = player.dimension?.id || "?";
 
     if (!event.initialSpawn) return;
 

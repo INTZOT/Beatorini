@@ -13,6 +13,28 @@ const ENTITY_SPAWN_WHITELIST = new Set([
   "minecraft:player",
   "minecraft:fireworks_rocket",
   "minecraft:armor_stand",
+  // 下列实体是无害的短命/装饰实体：旧白名单把它们一并删除，
+  // 结果是"大厅里丢东西/钓鱼/射箭，东西凭空消失"
+  "minecraft:item",
+  "minecraft:xp_orb",
+  "minecraft:fishing_hook",
+  "minecraft:arrow",
+  "minecraft:snowball",
+  "minecraft:egg",
+  "minecraft:ender_pearl",
+  "minecraft:eye_of_ender",
+  "minecraft:boat",
+  "minecraft:chest_boat",
+  "minecraft:minecart",
+  "minecraft:hopper_minecart",
+  "minecraft:tnt_minecart",
+  "minecraft:chest_minecart",
+  "minecraft:command_block_minecart",
+  "minecraft:leash_knot",
+  "minecraft:painting",
+  "minecraft:item_frame",
+  "minecraft:glow_item_frame",
+  "minecraft:falling_block",
 ]);
 
 function isAdmin(entity) {
@@ -48,7 +70,15 @@ export function init() {
     if (ENTITY_SPAWN_WHITELIST.has(ent.typeId)) return;
     try {
       ent.remove();
-    } catch (e) {}
+    } catch (e) {
+      // 限流记录：删除失败以前完全无声，大厅里会残留不该存在的实体
+      const key = `spawn:${ent.typeId}`;
+      const last = warnCooldown.get(key) ?? 0;
+      if (Date.now() - last > 60000) {
+        warnCooldown.set(key, Date.now());
+        console.warn(`[LobbyGuard] 移除实体失败（${ent.typeId}）：${e}`);
+      }
+    }
   });
 
   world.beforeEvents.playerBreakBlock.subscribe((event) => {
@@ -92,8 +122,15 @@ export function init() {
 
   world.beforeEvents.entityHurt.subscribe((event) => {
     const attacker = event.damageSource?.damagingEntity;
-    if (!attacker || attacker.typeId !== "minecraft:player") return;
-    if (isAdmin(attacker) || !inLobby(attacker)) return;
+    // 与 entitySpawn 同样的守卫：伤害来源实体可能在回调执行前就失效，
+    // 直接读 typeId/dimension 会抛 InvalidEntityError 并让"禁止攻击"静默失效
+    if (!attacker || !attacker.isValid) return;
+    try {
+      if (attacker.typeId !== "minecraft:player") return;
+      if (isAdmin(attacker) || !inLobby(attacker)) return;
+    } catch (e) {
+      return;
+    }
     event.cancel = true;
     warnOnce(attacker, "§c大厅内禁止攻击");
   });

@@ -53,6 +53,25 @@ export function getStat(playerId, prefix) {
   return world.getDynamicProperty(prefix + playerId) ?? 0;
 }
 
+/** 在线时长内存缓冲：playerId -> 秒数（30 秒或离线时落盘） */
+const playtimeBuffer = new Map();
+
+/** 把缓冲的在线时长写回动态属性；传 playerId 只落该玩家 */
+function flushPlaytime(onlyPlayerId) {
+  if (onlyPlayerId) {
+    const seconds = playtimeBuffer.get(onlyPlayerId);
+    if (!seconds) return;
+    playtimeBuffer.delete(onlyPlayerId);
+    addStat(onlyPlayerId, STATS_PLAYTIME_PREFIX, seconds);
+    return;
+  }
+  for (const [playerId, seconds] of [...playtimeBuffer]) {
+    if (!seconds) continue;
+    playtimeBuffer.delete(playerId);
+    addStat(playerId, STATS_PLAYTIME_PREFIX, seconds);
+  }
+}
+
 /** 累加玩家统计值 */
 export function addStat(playerId, prefix, amount) {
   world.setDynamicProperty(prefix + playerId, getStat(playerId, prefix) + amount);
@@ -84,12 +103,32 @@ export function init() {
     }, 10);
   });
 
-  // --- 在线时长计时（每秒） ---
+  // --- 在线时长：内存累加，每 30 秒批量落盘（原来每秒每人一次世界级 DP 读 + 写，
+  //     100 人 24 小时 ≈ 1700 万次写，是世界 DP 最大的写放大来源）---
   system.runInterval(() => {
-    for (const player of world.getPlayers()) {
-      addStat(player.id, STATS_PLAYTIME_PREFIX, 1);
+    try {
+      for (const player of world.getPlayers()) {
+        playtimeBuffer.set(player.id, (playtimeBuffer.get(player.id) ?? 0) + 1);
+      }
+    } catch (e) {
+      console.warn(`[Stats] 在线时长累加异常：${e}`);
     }
   }, 20);
+
+  system.runInterval(() => {
+    try {
+      flushPlaytime();
+    } catch (e) {
+      console.warn(`[Stats] 在线时长落盘异常：${e}`);
+    }
+  }, 20 * 30);
+
+  // 玩家离线时立即落盘（避免丢最后一分钟）
+  world.afterEvents.playerLeave.subscribe((event) => {
+    try {
+      flushPlaytime(event.playerId);
+    } catch (e) {}
+  });
 
   // --- 击杀统计 ---
   world.afterEvents.entityDie.subscribe((event) => {

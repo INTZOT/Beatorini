@@ -1,6 +1,8 @@
+import { notifyIfBusy } from "../lib/form.js";
 import { system, world, ItemTypes, BlockTypes } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
 import { countItem, removeItems, giveItemToPlayer } from "../lib/inventory.js";
+import { safeParseArray } from "../lib/json.js";
 import { getPlayerMoney } from "./money.js";
 import {
   storeItem,
@@ -11,11 +13,52 @@ import {
   getVaultEntities,
   getVaultCount,
 } from "./vault.js";
-import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_QUARANTINE_KEY } from "./config.js";
+import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_QUARANTINE_KEY, MARKET_VAULT_READY_KEY } from "./config.js";
 
 // --- 市场超时自动下架 ---
 const AUTO_DELIST_MS = 48 * 60 * 60 * 1000; // 上架超过48小时未售出
 const MARKET_AUTO_DELIST_INTERVAL_TICKS = 20 * 60 * 10; // 每10分钟检查一次
+
+// 本次脚本加载时刻：金库「内容可信」时间戳必须 ≥ 该值
+const SESSION_START_MS = Date.now();
+
+/**
+ * 金库内容是否已确认可信（启动对账与自动下架的前置条件）。
+ * 只数实体数量是不够的：vault.js 在等待实体加载超时后会补建「空容器」实体并清理悬空索引，
+ * 数量会瞬间达标但内容为空 —— 此时对账会把全服在售清单当成丢失而批量隔离（物品无法自动找回）。
+ * 因此要求 vault.js 在 ensureVaultEntities() 真正跑完后写入本次启动的时间戳。
+ */
+function vaultContentTrusted() {
+  try {
+    const readyAt = world.getDynamicProperty(MARKET_VAULT_READY_KEY);
+    return typeof readyAt === "number" && readyAt >= SESSION_START_MS;
+  } catch (e) {
+    console.error(`[Market] 读取金库就绪时间戳失败：${e}`);
+    return false;
+  }
+}
+
+/**
+ * 改钱并**校验命令真的生效**，返回 true 表示已生效。
+ * 为什么需要：`runCommand` 在"没有实际生效"时很多情况**不抛异常**，只返回 `successCount: 0`；
+ * 旧代码丢弃返回值（且异常被空 catch 吞掉），可能出现"扣款没扣成但货已发"的凭空造币路径。
+ */
+function changeMoney(player, delta, reason) {
+  const op = delta >= 0 ? "add" : "remove";
+  const amount = Math.abs(Math.round(delta));
+  if (!Number.isFinite(amount) || amount <= 0) return false;
+  try {
+    const res = player.runCommand(`scoreboard players ${op} @s money ${amount}`);
+    if ((res?.successCount ?? 0) >= 1) return true;
+    console.error(
+      `[Market] 改钱未生效（${reason}）：${op} ${amount} → ${player.name ?? player.id}`
+    );
+    return false;
+  } catch (e) {
+    console.error(`[Market] 改钱抛错（${reason}）：${e}`);
+    return false;
+  }
+}
 
 /**
  * 校验金库物品与清单一致（typeId + 数量 + NBT 指纹）。
@@ -37,15 +80,14 @@ function stackMatchesListing(stack, listing) {
 // ============================================================
 
 function getMarketListings() {
-  const raw = world.getDynamicProperty(MARKET_LISTINGS_KEY);
-  return raw ? JSON.parse(raw) : [];
+  // 坏数据不再抛穿到表单/事件回调（整条市场功能会静默失效）
+  return safeParseArray(world.getDynamicProperty(MARKET_LISTINGS_KEY), MARKET_LISTINGS_KEY);
 }
 function setMarketListings(listings) {
   world.setDynamicProperty(MARKET_LISTINGS_KEY, JSON.stringify(listings));
 }
 function getMarketQuarantine() {
-  const raw = world.getDynamicProperty(MARKET_QUARANTINE_KEY);
-  return raw ? JSON.parse(raw) : [];
+  return safeParseArray(world.getDynamicProperty(MARKET_QUARANTINE_KEY), MARKET_QUARANTINE_KEY);
 }
 function setMarketQuarantine(list) {
   world.setDynamicProperty(MARKET_QUARANTINE_KEY, JSON.stringify(list));
@@ -67,8 +109,10 @@ function clearMarketSold(playerId) {
   world.setDynamicProperty(MARKET_SOLD_PREFIX + playerId, undefined);
 }
 function getMarketReturns(playerId) {
-  const raw = world.getDynamicProperty(MARKET_RETURNS_PREFIX + playerId);
-  return raw ? JSON.parse(raw) : [];
+  return safeParseArray(
+    world.getDynamicProperty(MARKET_RETURNS_PREFIX + playerId),
+    MARKET_RETURNS_PREFIX + playerId
+  );
 }
 function setMarketReturns(playerId, list) {
   world.setDynamicProperty(MARKET_RETURNS_PREFIX + playerId, JSON.stringify(list));
@@ -138,7 +182,7 @@ function showMarketMenu(player, backFn) {
       form.close();
       system.runTimeout(() => backFn(player), 2);
     });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 function showMarketBrowse(player, backFn) {
@@ -173,7 +217,7 @@ function showMarketBrowse(player, backFn) {
     form.close();
     system.runTimeout(() => showMarketMenu(player, backFn), 2);
   });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 function confirmMarketPurchase(player, listing, backFn) {
@@ -215,11 +259,14 @@ function confirmMarketPurchase(player, listing, backFn) {
       allListings.splice(idx, 1);
       setMarketListings(allListings);
 
-      try {
-        buyer.runCommand(
-          `scoreboard players remove @s money ${confirmed.price}`
-        );
-      } catch (e) {}
+      // 扣款必须确认真的生效，否则可能"没扣钱却拿到货"（凭空造币）
+      if (!changeMoney(buyer, -confirmed.price, `购买扣款 ${confirmed.id}`)) {
+        const rollback = getMarketListings();
+        rollback.push(confirmed);
+        setMarketListings(rollback);
+        buyer.sendMessage("§c扣款失败，交易已取消（金币未扣、商品未动）");
+        return;
+      }
 
       // 从金库无损取出物品
       const stack = takeItem(confirmed.vault?.index, confirmed.vault?.slot);
@@ -227,11 +274,7 @@ function confirmMarketPurchase(player, listing, backFn) {
         const rollbackListings = getMarketListings();
         rollbackListings.push(confirmed);
         setMarketListings(rollbackListings);
-        try {
-          buyer.runCommand(
-            `scoreboard players add @s money ${confirmed.price}`
-          );
-        } catch (e) {}
+        changeMoney(buyer, confirmed.price, `商品不可用退款 ${confirmed.id}`);
         buyer.sendMessage("§c商品暂时不可用，已退款！");
         console.error(
           `[Market] Vault item missing for listing ${confirmed.id}: ${confirmed.typeId} x${confirmed.amount}`
@@ -250,11 +293,7 @@ function confirmMarketPurchase(player, listing, backFn) {
         const rollbackListings = getMarketListings();
         rollbackListings.push(confirmed);
         setMarketListings(rollbackListings);
-        try {
-          buyer.runCommand(
-            `scoreboard players add @s money ${confirmed.price}`
-          );
-        } catch (e) {}
+        changeMoney(buyer, confirmed.price, `交易失败退款 ${confirmed.id}`);
         buyer.sendMessage("§c交易校验失败（物品与清单不符），已退款！请稍后再试");
         console.error(
           `[Market] Mismatch on buy ${confirmed.id}: expect ${confirmed.typeId} x${confirmed.amount}, got ${stack.typeId} x${stack.amount}, putBack=${putBack}`
@@ -280,11 +319,7 @@ function confirmMarketPurchase(player, listing, backFn) {
         const rollbackListings = getMarketListings();
         rollbackListings.push(confirmed);
         setMarketListings(rollbackListings);
-        try {
-          buyer.runCommand(
-            `scoreboard players add @s money ${confirmed.price}`
-          );
-        } catch (e) {}
+        changeMoney(buyer, confirmed.price, `交易失败退款 ${confirmed.id}`);
         buyer.sendMessage("§c交易失败，已退款！请重试");
         console.error(`[Market] Delivery failed: ${e}`);
         return;
@@ -301,11 +336,13 @@ function confirmMarketPurchase(player, listing, backFn) {
           (p) => p.id === confirmed.sellerId
         );
         if (seller) {
-          try {
-            seller.runCommand(
-              `scoreboard players add @s money ${sellerEarn}`
+          // 到账失败不能静默：转入"离线收益"队列，下次上线补发
+          if (!changeMoney(seller, sellerEarn, `售出到账 ${confirmed.id}`)) {
+            addMarketSold(seller.id, sellerEarn);
+            console.warn(
+              `[Market] 卖家到账未生效，已转入离线收益队列：${seller.name} +${sellerEarn}`
             );
-          } catch (e) {}
+          }
           seller.sendMessage(
             {
               rawtext: [
@@ -341,7 +378,7 @@ function confirmMarketPurchase(player, listing, backFn) {
       form.close();
       system.runTimeout(() => showMarketBrowse(player, backFn), 2);
     });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, p)).catch((e) => console.warn("Form show failed:", e));
 }
 
 function showMarketCreateListing(player, backFn) {
@@ -492,7 +529,7 @@ function showMarketCreateListing(player, backFn) {
       form.close();
       system.runTimeout(() => showMarketMenu(player, backFn), 2);
     });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 function showMarketMyListings(player, backFn) {
@@ -574,7 +611,7 @@ function showMarketMyListings(player, backFn) {
     form.close();
     system.runTimeout(() => showMarketMenu(player, backFn), 2);
   });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 function showMarketUnlockForm(player, backFn) {
@@ -588,9 +625,11 @@ function showMarketUnlockForm(player, backFn) {
     .label(canAfford ? "§a金币充足，可以解锁" : "§c金币不足，无法解锁");
   if (canAfford) {
     form.spacer().button("确认解锁", () => {
-      player.runCommand(
-        `scoreboard players remove @s money ${MARKET_UNLOCK_COST}`
-      );
+      // 扣费必须确认生效才发放解锁，否则"点一下白拿市场"
+      if (!changeMoney(player, -MARKET_UNLOCK_COST, "市场解锁扣费")) {
+        player.sendMessage("§c扣费失败，解锁未完成，请稍后再试");
+        return;
+      }
       world.setDynamicProperty(MARKET_UNLOCKED_PREFIX + player.id, true);
       player.sendMessage("§a市场已解锁！");
       player.playSound("random.orb");
@@ -602,7 +641,7 @@ function showMarketUnlockForm(player, backFn) {
     form.close();
     system.runTimeout(() => backFn(player), 2);
   });
-  form.show().catch((e) => console.warn("Market unlock form failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Market unlock form failed:", e));
 }
 
 /** 玩家上线：领取离线售出金币 + 返还下架物品 */
@@ -610,9 +649,19 @@ function onPlayerJoin(player) {
   const pendingGold = getMarketSold(player.id);
   if (pendingGold > 0) {
     system.runTimeout(() => {
-      try {
-        player.runCommand(`scoreboard players add @s money ${pendingGold}`);
-      } catch (e) {}
+      // 加款未确认生效前绝不清零，否则金币静默蒸发（下次上线还能重试）
+      if (!player.isValid) {
+        console.warn(
+          `[Market] 玩家已失效，离线收益 ${pendingGold} 金币保留待下次上线`
+        );
+        return;
+      }
+      if (!changeMoney(player, pendingGold, `离线售出收益 ${player.id}`)) {
+        console.warn(
+          `[Market] 离线收益发放未生效（${pendingGold} 金币），金额已保留待重试`
+        );
+        return;
+      }
       clearMarketSold(player.id);
       player.sendMessage(
         `§e市场：离线期间售出商品，获得 §6${pendingGold}金币`
@@ -697,8 +746,9 @@ export function init() {
   }, 20 * 60);
 }
 
-/** 金库已加载完成才执行依赖金库的操作 */
+/** 金库已加载完成且内容可信才执行依赖金库的操作 */
 function isVaultReadyForMarket() {
+  if (!vaultContentTrusted()) return false;
   const expected = getVaultCount();
   const found = getVaultEntities().length;
   if (expected > 0 && found < expected) return false;
@@ -789,29 +839,50 @@ function autoDelistExpiredListings() {
  * 金库加载不出来（或存在商品但金库计数异常）时保留全部清单，避免误删商品。
  */
 function scheduleMarketReconcile(attempt) {
-  const expected = getVaultCount();
-  const found = getVaultEntities().length;
-  const listings = getMarketListings();
+  try {
+    const expected = getVaultCount();
+    const found = getVaultEntities().length;
+    const listings = getMarketListings();
 
-  if (expected > 0 && found < expected) {
-    if (attempt < 60) {
-      system.runTimeout(() => scheduleMarketReconcile(attempt + 1), 20);
+    // 金库内容未确认可信（本次启动未写入就绪时间戳）→ 绝不对账
+    if (!vaultContentTrusted()) {
+      if (attempt < 60) {
+        system.runTimeout(() => scheduleMarketReconcile(attempt + 1), 20);
+        return;
+      }
+      console.error(
+        `[Market] 金库内容未确认可信（本次启动未写入就绪时间戳，实体 ${found}/${expected}），` +
+          `跳过启动对账以保留全部商品清单`
+      );
       return;
     }
-    console.error(
-      `[Market] 金库实体未完全加载（${found}/${expected}），跳过启动对账以保留全部商品清单`
-    );
-    return;
-  }
 
-  if (listings.length > 0 && expected === 0 && found === 0) {
-    console.error(
-      "[Market] 存在商品清单但金库计数为 0，跳过启动对账以保留全部商品清单"
-    );
-    return;
-  }
+    if (expected > 0 && found < expected) {
+      if (attempt < 60) {
+        system.runTimeout(() => scheduleMarketReconcile(attempt + 1), 20);
+        return;
+      }
+      console.error(
+        `[Market] 金库实体未完全加载（${found}/${expected}），跳过启动对账以保留全部商品清单`
+      );
+      return;
+    }
 
-  reconcileMarketVault();
+    if (listings.length > 0 && expected === 0 && found === 0) {
+      console.error(
+        "[Market] 存在商品清单但金库计数为 0，跳过启动对账以保留全部商品清单"
+      );
+      return;
+    }
+
+    reconcileMarketVault();
+  } catch (e) {
+    // 递归链里抛错不会被外层捕获，之前会静默断链；现在记录并续试
+    console.error(`[Market] 启动对账异常（attempt=${attempt}/60）：${e}`);
+    if (attempt < 60) {
+      system.runTimeout(() => scheduleMarketReconcile(attempt + 1), 20);
+    }
+  }
 }
 
 function reconcileMarketVault() {

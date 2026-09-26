@@ -2,6 +2,7 @@
 // 管理员面板：管理菜单 + 岛屿管理
 // 入口：手持命令方块矿车右键（menus.js 转发）
 // ============================================================
+import { notifyIfBusy } from "../lib/form.js";
 import { system, world } from "@minecraft/server";
 import { CustomForm } from "@minecraft/server-ui";
 import {
@@ -43,7 +44,7 @@ export function showAdminMenu(player) {
   });
   form.spacer();
   form.button("关闭", () => form.close());
-  form.show().catch((e) => console.warn("Admin menu failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Admin menu failed:", e));
 }
 
 function showIslandAdminMenu(player) {
@@ -123,5 +124,5 @@ function showIslandAdminMenu(player) {
     system.runTimeout(() => showAdminMenu(player), 2);
   });
   form.spacer().button("关闭", () => form.close());
-  form.show().catch((e) => console.warn("Island admin form failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Island admin form failed:", e));
 }

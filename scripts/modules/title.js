@@ -1,3 +1,4 @@
+import { notifyIfBusy } from "../lib/form.js";
 import { world, system, TextPrimitive } from "@minecraft/server";
 import { CustomForm, ObservableNumber, ObservableString } from "@minecraft/server-ui";
 import {
@@ -502,8 +503,11 @@ function refreshAllTitleShapes() {
     for (const [id, shape] of [...titleShapes]) {
       try {
         world.primitiveShapesManager.removeText(shape);
-      } catch (e) {}
-      titleShapes.delete(id);
+        titleShapes.delete(id);
+      } catch (e) {
+        // 移除失败就保留句柄，下次再试（否则形状残留在世界里且永远拿不回来）
+        console.warn(`[Title] 移除头顶称号失败（${id}），保留句柄待重试：${e}`);
+      }
     }
     return;
   }
@@ -515,7 +519,9 @@ function refreshAllTitleShapes() {
   for (const [ownerId, shape] of titleShapes) {
     try {
       shape.visibleTo = players.filter((p) => p.id !== ownerId);
-    } catch (e) {}
+    } catch (e) {
+      console.warn(`[Title] 同步称号可见性失败（${ownerId}）：${e}`);
+    }
   }
 }
 
@@ -524,8 +530,10 @@ function removeTitleShape(playerId) {
   if (!shape) return;
   try {
     world.primitiveShapesManager.removeText(shape);
-  } catch (e) {}
-  titleShapes.delete(playerId);
+    titleShapes.delete(playerId);
+  } catch (e) {
+    console.warn(`[Title] 移除头顶称号失败（${playerId}），保留句柄待重试：${e}`);
+  }
 }
 
 /** 重建某玩家的头顶称号（无称号时清除） */
@@ -620,7 +628,7 @@ export function showTitleMenu(player, backFn) {
       system.runTimeout(() => backFn(player), 2);
     });
 
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 /** 初始化：无有效称号（含旧版原始文本）的玩家自动佩戴「萌新」 */
@@ -633,8 +641,11 @@ export function init() {
       const rawNotify = world.getDynamicProperty(TITLE_NOTIFY_PREFIX + p.id);
       if (typeof rawNotify === "string") {
         try {
-          notified = JSON.parse(rawNotify);
-        } catch (e) {}
+          const parsed = JSON.parse(rawNotify);
+          notified = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          console.warn(`[Title] 称号通报记录解析失败（${p.id}），按未通报处理：${e}`);
+        }
       }
       let changed = false;
       for (const t of TITLES) {
@@ -687,8 +698,15 @@ export function init() {
     removeTitleShape(event.entity.id);
   });
   world.afterEvents.entityStopSneaking.subscribe((event) => {
-    if (event.entity.typeId !== "minecraft:player") return;
-    syncTitleShape(event.entity);
+    const ent = event.entity;
+    // 实体可能在事件与回调之间失效：直接读 typeId/dimension 会抛 InvalidEntityError
+    if (!ent || !ent.isValid) return;
+    try {
+      if (ent.typeId !== "minecraft:player") return;
+      syncTitleShape(ent);
+    } catch (e) {
+      console.warn(`[Title] 蹲下事件同步称号失败：${e}`);
+    }
   });
   world.afterEvents.worldLoad.subscribe(() => {
     system.runTimeout(() => {

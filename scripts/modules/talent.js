@@ -1,3 +1,4 @@
+import { notifyIfBusy } from "../lib/form.js";
 import { system, world } from "@minecraft/server";
 import { CustomForm } from "@minecraft/server-ui";
 import { getPlayerMoney } from "./money.js";
@@ -176,7 +177,8 @@ function renderBar(level) {
     return "§k" + "●".repeat(12);
   }
   const segment = Math.min(10, Math.max(1, Math.ceil(level / 12)));
-  const filled = level % 12 === 0 ? 12 : level % 12;
+  // LV0 未解锁：旧写法 level % 12 === 0 成立 → 显示 12 个实心点（与"未解锁"矛盾）
+  const filled = level <= 0 ? 0 : level % 12 === 0 ? 12 : level % 12;
   const color = BAR_COLORS[segment - 1];
   return color + "●".repeat(filled) + "○".repeat(12 - filled);
 }
@@ -213,7 +215,7 @@ function showTalentMenu(player, backFn) {
     f.close();
     system.runTimeout(() => backFn(player), 2);
   });
-  f.show().catch((e) => console.warn("Talent menu failed:", e));
+  f.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Talent menu failed:", e));
 }
 
 function showTalentDetail(player, talentId, backFn) {
@@ -270,7 +272,7 @@ function showTalentDetail(player, talentId, backFn) {
     form.close();
     system.runTimeout(() => showTalentMenu(player, backFn), 2);
   });
-  form.show().catch((e) => console.warn("Talent detail failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Talent detail failed:", e));
 }
 
 // ============================================================
@@ -318,7 +320,10 @@ export function init() {
         if (level <= 0) continue;
         try {
           applyTalentEffects(player, talent, level);
-        } catch (e) {}
+        } catch (e) {
+          // 不再静默：天赋"面板已解锁但永远没 buff"这种问题必须能从日志看出来
+          console.warn(`[Talent] ${talent.id} LV${level} 施放失败（${player.name ?? pid}）：${e}`);
+        }
       }
     }
   }, 10);

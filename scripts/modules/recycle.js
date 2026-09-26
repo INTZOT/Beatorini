@@ -1,9 +1,11 @@
+import { notifyIfBusy, validIndex } from "../lib/form.js";
 import { system, world } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
 import { countItem, removeItems } from "../lib/inventory.js";
 import { getPlayerMoney } from "./money.js";
 import {
   RECYCLE_DAILY_CAP,
+  RECYCLE_WINDOW,
   RECYCLE_CUM_PREFIX,
 } from "./config.js";
 
@@ -85,7 +87,7 @@ const RECYCLE_CATEGORIES = {
       { label: "皮革", typeId: "minecraft:leather", price: 100 },
       { label: "鸡蛋", typeId: "minecraft:egg", price: 100 },
       { label: "羽毛", typeId: "minecraft:feather", price: 100 },
-      { label: "海龟鳞甲", typeId: "minecraft:scute", price: 1600 },
+      { label: "海龟鳞甲", typeId: "minecraft:turtle_scute", price: 1600 },
       { label: "犰狳鳞甲", typeId: "minecraft:armadillo_scute", price: 800 },
     ],
   },
@@ -93,13 +95,15 @@ const RECYCLE_CATEGORIES = {
 
 // --- 阶梯降价：原价窗口 16万 → 每次降价窗口 8万/4万/2万/1万 → 归零 ---
 // 每档单价 = 基础价 × 对应系数（默认每次减半）
+// 档位由 config 的 RECYCLE_WINDOW 推导（数值与原硬编码完全一致，只是不再重复写死）：
+// 窗口宽度依次减半 → 累计偏移 = W·(1 - 1/2^k)，即 1.5W / 1.75W / 1.875W / 1.9375W；
+// 最后一档等于 RECYCLE_DAILY_CAP（160000 × 1.9375 = 310000），达到即归零。
 const RECYCLE_PRICE_STEPS = [
-  { at: 160000, factor: 1 }, // 原价窗口
-  { at: 240000, factor: 0.5 }, // 第一次降价窗口（+8万）
-  { at: 280000, factor: 0.25 }, // 第二次降价窗口（+4万）
-  { at: 300000, factor: 0.125 }, // 第三次降价窗口（+2万）
-  { at: 310000, factor: 0.0625 }, // 第四次降价窗口（+1万）
-  // 达到 310000 后价格为 0
+  { at: RECYCLE_WINDOW, factor: 1 },
+  { at: RECYCLE_WINDOW * 1.5, factor: 0.5 },
+  { at: RECYCLE_WINDOW * 1.75, factor: 0.25 },
+  { at: RECYCLE_WINDOW * 1.875, factor: 0.125 },
+  { at: RECYCLE_WINDOW * 1.9375, factor: 0.0625 },
 ];
 
 // --- 回收动态定价：按个人当日累计回收金额边际递减 ---
@@ -185,7 +189,7 @@ function showRecycleCategoryMenu(player, backFn) {
     form.close();
     system.runTimeout(() => backFn(player), 2);
   });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // --- 三级菜单：类别物品回收 ---
@@ -234,7 +238,11 @@ function showRecycleCategory(player, catName, catData, backFn) {
     .dropdown("选择物品", selectedIdx, dropdownItems)
     .spacer()
     .button("回收", () => {
-      const idx = selectedIdx.getData();
+      const idx = validIndex(selectedIdx.getData(), items.length);
+      if (idx === undefined) {
+        player.sendMessage("§c选择无效，请重试");
+        return;
+      }
       const qty = quantity.getData();
       const item = items[idx];
       const owned = countItem(player, item.typeId);
@@ -253,9 +261,30 @@ function showRecycleCategory(player, catName, catData, backFn) {
         return;
       }
 
+      // 当日额度夹取：整批按"交易前档位"结算会被大批量回收绕过上限
+      // （旧写法 64 个下界残骸一次可拿 819,200，而上限是 310,000）
+      const remainingQuota = Math.max(0, RECYCLE_DAILY_CAP - cum);
+      const reward = Math.min(price * qty, remainingQuota);
+      if (reward <= 0) {
+        player.sendMessage(`§c${item.label.split(" -")[0]} 今日回收额度已用完`);
+        player.playSound("random.break");
+        return;
+      }
+
       removeItems(player, item.typeId, qty);
-      const reward = price * qty;
-      player.runCommand(`scoreboard players add @s money ${reward}`);
+      try {
+        const res = player.runCommand(
+          `scoreboard players add @s money ${Math.round(reward)}`
+        );
+        if ((res?.successCount ?? 0) < 1) {
+          console.error(
+            `[Recycle] 收益发放未生效：${reward} → ${player.name ?? player.id}，物品已扣除，请人工核对`
+          );
+          player.sendMessage("§c收益发放异常，请联系管理员核对");
+        }
+      } catch (e) {
+        console.error(`[Recycle] 收益发放抛错：${e}`);
+      }
       addRecycleCum(player, item.typeId, reward);
 
       goldLabel.setData(`§6当前金币: ${getPlayerMoney(player)}`);
@@ -280,7 +309,7 @@ function showRecycleCategory(player, catName, catData, backFn) {
       form.close();
       system.runTimeout(() => showRecycleCategoryMenu(player, backFn), 2);
     });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 export { showRecycleCategoryMenu };

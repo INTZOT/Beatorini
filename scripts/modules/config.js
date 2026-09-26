@@ -25,14 +25,19 @@ export const ISLAND_NOTIFICATIONS_PREFIX = "island:notifications_";
 export const MAX_ISLAND_MEMBERS = 5;
 export const ISLAND_BOUNDARY_PREFIX = "island:boundary_"; // 岛屿动态边界（六极值 JSON）
 export const ISLAND_BOUNDARY_LIMIT = 256; // 水平方向（x/z）自动扩展上限（超出不扩展，重置不覆盖）
-export const ISLAND_BOUNDARY_LIMIT_Y = 512; // 垂直方向（y）自动扩展上限，与维度上限一致
+// 垂直方向不再用 ±512 的绝对值判据（那会让上限永不生效），改用下面的
+// ISLAND_DIMENSION_MIN_Y / ISLAND_BUILD_MAX_Y 做区间判据（见 island.js）。
 
 // --- 空岛维度高度（由 tools/gen-island-dimensions.js 生成 dimensions/island_void_N.json） ---
 // 实测（BDS 1.26.51）：文档写 height_range ≤ 384，但真实约束是 min_y + height_range ≤ 512，
 // 即维度最高点不能超过 512；超过会被整份 JSON 拒绝（维度静默回落默认值）。
 export const ISLAND_DIMENSION_MIN_Y = -64; // 维度底部
 export const ISLAND_DIMENSION_HEIGHT_RANGE = 576; // 总高（-64 + 576 = 最高点 512）
-export const ISLAND_DIMENSION_MAX_Y = 512; // 建筑上限；改动时三个值必须自洽
+export const ISLAND_DIMENSION_MAX_Y = 512; // 维度边界层（只读不可写）；改动时三个值必须自洽
+// 可建造上限：512 是只读边界层（setblock/fillBlocks 到 512 会报
+// "Requested fill volume height [...] was outside the world"，实测），因此
+// 边界判据与重置 /fill 上界都必须用 511，否则顶段永远清不掉。
+export const ISLAND_BUILD_MAX_Y = ISLAND_DIMENSION_MAX_Y - 1; // 511
 
 export const ISLAND_BOUNDARY_INITIAL = {
   xMin: -8,
@@ -144,3 +149,10 @@ export const MARKET_VAULT_INDEX_MAP_KEY = "market:vault_index_map"; // 实体 un
 // 换名可让 hasTickingArea() 返回 false，强制走一次全新创建。
 // 旧记录成为无害孤儿（不再被引用），后续可用 removeTickingArea 清理。
 export const MARKET_VAULT_TICKINGAREA = "beatorini_market_vault_v2";
+// 更名前的旧记录名：部分存档里会残留成"僵尸区域"（hasTickingArea() 恒 true，但区块并未常载）。
+// setupVault 启动时尽力清理，避免继续占用共享 chunk 预算。
+export const MARKET_VAULT_LEGACY_TICKINGAREA = "beatorini_market_vault";
+// 金库"内容可信"时间戳：ensureVaultEntities() 真正跑完后写入。
+// market.js 的启动对账必须看到本次启动写入的新值才允许执行 —— 否则"实体数量够了"可能只是
+// 补建出来的空容器，对账会把全服在售清单当成丢失而批量隔离（物品无法自动找回）。
+export const MARKET_VAULT_READY_KEY = "market:vault_ready_at";

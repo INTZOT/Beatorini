@@ -66,6 +66,31 @@ export function showSigninForm(player) {
   let showing = false;
   let warned = false;
 
+  // 玩家正忙时的重试：指数退避 + 上限（旧写法每 tick 重试，挂机 1 分钟会构造 ~1200 个表单）
+
+  let busyRetries = 0;
+
+  const scheduleBusyRetry = () => {
+
+    if (signed || closed) return;
+
+    busyRetries++;
+
+    if (busyRetries > 30) {
+
+      console.warn('[Signin] 签到表单连续 30 次未能展示（玩家持续忙碌），已停止重试');
+
+      return;
+
+    }
+
+    const delay = Math.min(40, 1 << Math.min(5, busyRetries));
+
+    system.runTimeout(attempt, delay);
+
+  };
+
+
   function attempt() {
     if (closed || signed || showing) return;
     try {
@@ -113,17 +138,41 @@ export function showSigninForm(player) {
           return;
         }
         const newStreak = streak + 1;
+        // 先发钱、确认生效后再记录签到：旧顺序一旦发钱失败，玩家当天已无法再签 → 静默损失
+        try {
+          const res = player.runCommand(
+            `scoreboard players add @s money ${reward}`
+          );
+          if ((res?.successCount ?? 0) < 1) {
+            console.error(
+              `[Signin] 奖励发放未生效，本次不记录签到（${player.name ?? player.id} +${reward}）`
+            );
+            player.sendMessage("§c奖励发放异常，签到未记录，请稍后重试");
+            form.close();
+            return;
+          }
+        } catch (e) {
+          console.error(`[Signin] 奖励发放抛错，本次不记录签到：${e}`);
+          player.sendMessage("§c奖励发放异常，签到未记录，请稍后重试");
+          form.close();
+          return;
+        }
+
         saveSigninInfo(player.id, today, newStreak);
-        player.runCommand(`scoreboard players add @s money ${reward}`);
         player.sendMessage(
           `§a签到成功！获得 ${reward} 金币，连续签到 ${newStreak} 天`
         );
         player.playSound("random.orb");
         statusText.setData(`§a你已连续签到 ${newStreak} 天！`);
-        player.dimension.spawnEntity(
-          "minecraft:fireworks_rocket",
-          player.location
-        );
+        // 烟花只是特效：失败不能影响签到结果，也不能让表单卡住
+        try {
+          player.dimension.spawnEntity(
+            "minecraft:fireworks_rocket",
+            player.location
+          );
+        } catch (e) {
+          console.warn(`[Signin] 签到烟花生成失败（忽略）：${e}`);
+        }
         form.close();
       });
       form.spacer().divider().spacer();
@@ -180,15 +229,11 @@ export function showSigninForm(player) {
             closed = true;
           } else if (reason === "UserBusy") {
             // 玩家正忙/聊天框打开/其他界面占用：表单未真正展示，继续下一 tick
-            if (!signed && !closed) {
-              system.runTimeout(attempt, 1);
-            }
+            scheduleBusyRetry();
           } else {
             // canceled 为 undefined/true 但无明确原因：
             // 疑似进服瞬间客户端未就绪、表单未真正展示，视为未展示继续重试
-            if (!signed && !closed) {
-              system.runTimeout(attempt, 1);
-            }
+            scheduleBusyRetry();
           }
         })
         .catch((e) => {
@@ -197,9 +242,7 @@ export function showSigninForm(player) {
             warned = true;
             console.warn("Signin form failed:", e);
           }
-          if (!signed && !closed) {
-            system.runTimeout(attempt, 1);
-          }
+          scheduleBusyRetry();
         });
     } catch (e) {
       showing = false;

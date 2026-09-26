@@ -1,4 +1,5 @@
 import { system, world, BlockPermutation } from "@minecraft/server";
+import { ISLAND_DIMENSION_MIN_Y, ISLAND_BUILD_MAX_Y } from "./config.js";
 
 // --- 矿石生成机制 ---
 const lavaMineStreaks = new Map();
@@ -56,11 +57,20 @@ export function init() {
     // 检查相邻6个方块是否有岩浆
     let hasLava = false;
     for (const o of OFFSET_6) {
-      const neighbor = dimension.getBlock({
-        x: x + o.x,
-        y: y + o.y,
-        z: z + o.z,
-      });
+      const ny = y + o.y;
+      // 维度高度 -64..512（可写层 511）：在底部/顶部挖矿时相邻格可能越界，
+      // 直接 getBlock 会抛 LocationOutOfWorldBoundariesError 并中断整个回调
+      if (ny < ISLAND_DIMENSION_MIN_Y || ny > ISLAND_BUILD_MAX_Y) continue;
+      let neighbor;
+      try {
+        neighbor = dimension.getBlock({
+          x: x + o.x,
+          y: ny,
+          z: z + o.z,
+        });
+      } catch (e) {
+        continue;
+      }
       if (neighbor?.typeId === "minecraft:lava") {
         hasLava = true;
         break;

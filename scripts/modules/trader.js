@@ -5,13 +5,19 @@ import {
   LOBBY_DIMENSION_ID,
   LAST_TRADER_DAY_PREFIX,
   CLOCK_MARKER_TRADER_NOON,
+  ISLAND_DIMENSION_MIN_Y,
+  ISLAND_BUILD_MAX_Y,
 } from "./config.js";
 import { getPlayerBoundIndex } from "./island.js";
-import { onMarker, isClockReady } from "./clock.js";
+import { onMarker, isClockOperational, getClockTime } from "./clock.js";
 
 const FALLBACK_INTERVAL_TICKS = 100; // 世界时钟不可用时的轮询间隔（原实现）
 const TRADER_LIFETIME_TICKS = 20 * 60 * 10; // 商人停留 10 分钟后自动移除
+const WATCHDOG_INTERVAL_TICKS = 600; // 每 30 秒体检一次时钟是否真的在工作
 let fallbackHandle; // 兜底轮询句柄（system.runInterval 返回）
+let lastMarkerAt; // 最近一次 marker 触发时的 system.currentTick（诊断用）
+let lastClockSample; // 上次体检读到的 clock.time
+let stallCount = 0; // 时钟时间连续未推进的次数
 
 /** 在玩家附近寻找安全生成点：不生成在虚空，需要脚下实心方块 + 2 格垂直空间 */
 function findSafeSpawnNear(player) {
@@ -31,9 +37,16 @@ function findSafeSpawnNear(player) {
       const x = baseX + dx;
       const y = baseY + dy;
       const z = baseZ + dz;
-      const feet = dim.getBlock({ x, y, z });
-      const head = dim.getBlock({ x, y: y + 1, z });
-      const ground = dim.getBlock({ x, y: y - 1, z });
+      // 建筑上限提升到 511 后，高位玩家（y≥510）会扫到 512/513 → getBlock 越界抛错
+      if (y <= ISLAND_DIMENSION_MIN_Y || y + 1 >= ISLAND_BUILD_MAX_Y) continue;
+      let feet, head, ground;
+      try {
+        feet = dim.getBlock({ x, y, z });
+        head = dim.getBlock({ x, y: y + 1, z });
+        ground = dim.getBlock({ x, y: y - 1, z });
+      } catch (e) {
+        continue;
+      }
       if (!feet || !head || !ground) continue;
 
       // 不能为虚空
@@ -138,22 +151,34 @@ function triggerTraderWave(source) {
   }
 }
 
-/** 兜底：世界时钟不可用时沿用旧的 100 tick 轮询 + 正午窗口判断 */
+/**
+ * 兜底轮询：世界时钟不可用（或不会真的触发 marker）时，沿用原来的
+ * 100 tick 轮询 + 正午窗口判断。
+ * 与 marker 路径并存是安全的：trySpawnTrader 里"同一玩家 2 游戏日内只来一次"会去重。
+ */
 function pollTraderNoon() {
-  if (isClockReady()) {
-    // 时钟后来可用了，停掉兜底轮询
-    if (fallbackHandle !== undefined) {
-      try {
-        system.clearRun(fallbackHandle);
-      } catch (e) {}
-      fallbackHandle = undefined;
-    }
-    console.warn("[Trader] 世界时钟已可用，停止兜底轮询");
-    return;
+  try {
+    const timeOfDay = world.getTimeOfDay();
+    if (timeOfDay < 5500 || timeOfDay >= 6500) return;
+    triggerTraderWave("fallback-poll");
+  } catch (e) {
+    console.warn(`[Trader] 兜底轮询异常（本次跳过）：${e}`);
   }
-  const timeOfDay = world.getTimeOfDay();
-  if (timeOfDay < 5500 || timeOfDay >= 6500) return;
-  triggerTraderWave("fallback-poll");
+}
+
+function ensureFallbackRunning(reason) {
+  if (fallbackHandle !== undefined) return;
+  fallbackHandle = system.runInterval(pollTraderNoon, FALLBACK_INTERVAL_TICKS);
+  console.warn(`[Trader] 已启用 100 tick 轮询兜底（${reason}）`);
+}
+
+function stopFallback(reason) {
+  if (fallbackHandle === undefined) return;
+  try {
+    system.clearRun(fallbackHandle);
+  } catch (e) {}
+  fallbackHandle = undefined;
+  console.warn(`[Trader] 已停止 100 tick 轮询兜底（${reason}）`);
 }
 
 export function init() {
@@ -181,22 +206,43 @@ export function init() {
   }, 40);
 
   // --- 主路径：世界时钟「每 2 游戏日正午」的 time marker ---
-  onMarker(CLOCK_MARKER_TRADER_NOON, () => triggerTraderWave("marker"));
+  onMarker(CLOCK_MARKER_TRADER_NOON, () => {
+    lastMarkerAt = system.currentTick;
+    triggerTraderWave("marker");
+  });
 
-  // --- 兜底：世界加载后若时钟不可用，退回 100 tick 轮询 ---
+  // --- 兜底：世界加载后时钟不可用就退回 100 tick 轮询 ---
   world.afterEvents.worldLoad.subscribe(() => {
     system.runTimeout(() => {
-      if (isClockReady()) return;
-      if (fallbackHandle !== undefined) {
-        try {
-          system.clearRun(fallbackHandle);
-        } catch (e) {}
+      if (!isClockOperational()) {
+        ensureFallbackRunning("世界加载后时钟不可用");
       }
-      fallbackHandle = system.runInterval(
-        pollTraderNoon,
-        FALLBACK_INTERVAL_TICKS
-      );
-      console.warn("[Trader] 世界时钟不可用，已启用 100 tick 轮询兜底");
     }, 60);
   });
+
+  // --- 看门狗：时钟"存在但不工作"（被暂停 / marker 丢失 / 时间不推进）时兜底顶上 ---
+  // 之前的写法只看 isClockReady()，一旦为真就永久关掉兜底 —— 时钟若不触发 marker，
+  // 商人会彻底不来，而日志最后一行反而是"就绪"。
+  system.runInterval(() => {
+    try {
+      if (!isClockOperational()) {
+        ensureFallbackRunning("时钟不可用/已暂停/缺 marker");
+        return;
+      }
+      const now = getClockTime();
+      if (typeof now === "number" && typeof lastClockSample === "number") {
+        if (now > lastClockSample) {
+          stallCount = 0;
+        } else if (++stallCount >= 3) {
+          ensureFallbackRunning("时钟时间停止推进");
+        }
+      }
+      lastClockSample = now;
+      if (stallCount === 0) {
+        stopFallback("时钟工作正常");
+      }
+    } catch (e) {
+      ensureFallbackRunning(`看门狗异常：${e}`);
+    }
+  }, WATCHDOG_INTERVAL_TICKS);
 }

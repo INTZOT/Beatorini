@@ -1,3 +1,4 @@
+import { notifyIfBusy } from "../lib/form.js";
 import {
   system,
   world,
@@ -7,6 +8,8 @@ import {
 } from "@minecraft/server";
 import { CustomForm, ObservableNumber } from "@minecraft/server-ui";
 import { teleportPlayer } from "../lib/teleport.js";
+import { withTimeout } from "../lib/async.js";
+import { safeParseArray, safeParseObject } from "../lib/json.js";
 import { clearSignin } from "./signin.js";
 import { clearLavaStreak } from "./ore-gen.js";
 import {
@@ -24,7 +27,7 @@ import {
   ISLAND_NOTIFICATIONS_PREFIX,
   ISLAND_BOUNDARY_PREFIX,
   ISLAND_BOUNDARY_LIMIT,
-  ISLAND_BOUNDARY_LIMIT_Y,
+  ISLAND_BUILD_MAX_Y,
   ISLAND_BOUNDARY_INITIAL,
   ISLAND_DIMENSION_MIN_Y,
   ISLAND_DIMENSION_MAX_Y,
@@ -66,8 +69,10 @@ export function setIslandOwner(index, playerId) {
   world.setDynamicProperty(ISLAND_OWNER_PREFIX + index, playerId);
 }
 export function getIslandMembers(index) {
-  const raw = world.getDynamicProperty(ISLAND_MEMBERS_PREFIX + index);
-  return raw ? JSON.parse(raw) : [];
+  return safeParseArray(
+    world.getDynamicProperty(ISLAND_MEMBERS_PREFIX + index),
+    ISLAND_MEMBERS_PREFIX + index
+  );
 }
 export function setIslandMembers(index, members) {
   world.setDynamicProperty(
@@ -84,12 +89,13 @@ export function setIslandStatus(index, status) {
 
 // --- 动态边界（六极值，只增不减，用于自动重置范围） ---
 function getIslandBoundary(index) {
-  const raw = world.getDynamicProperty(ISLAND_BOUNDARY_PREFIX + index);
-  if (raw) {
-    try {
-      return JSON.parse(raw);
-    } catch (e) {}
-  }
+  const parsed = safeParseObject(
+    world.getDynamicProperty(ISLAND_BOUNDARY_PREFIX + index),
+    ISLAND_BOUNDARY_PREFIX + index
+  );
+  // 六个极值缺一不可，缺了就回退初始边界（避免 NaN 参与重置范围计算）
+  const keys = ["xMin", "xMax", "yMin", "yMax", "zMin", "zMax"];
+  if (keys.every((k) => Number.isFinite(parsed[k]))) return parsed;
   return { ...ISLAND_BOUNDARY_INITIAL };
 }
 
@@ -105,8 +111,10 @@ function resetIslandBoundary(index) {
 }
 
 function getJoinRequests(index) {
-  const raw = world.getDynamicProperty(ISLAND_JOIN_REQ_PREFIX + index);
-  return raw ? JSON.parse(raw) : [];
+  return safeParseArray(
+    world.getDynamicProperty(ISLAND_JOIN_REQ_PREFIX + index),
+    ISLAND_JOIN_REQ_PREFIX + index
+  );
 }
 function addJoinRequest(index, playerId, playerName) {
   const reqs = getJoinRequests(index);
@@ -124,8 +132,10 @@ function removeJoinRequest(index, playerId) {
   world.setDynamicProperty(ISLAND_JOIN_REQ_PREFIX + index, JSON.stringify(reqs));
 }
 function getVisitRequests(index) {
-  const raw = world.getDynamicProperty(ISLAND_VISIT_REQ_PREFIX + index);
-  return raw ? JSON.parse(raw) : [];
+  return safeParseArray(
+    world.getDynamicProperty(ISLAND_VISIT_REQ_PREFIX + index),
+    ISLAND_VISIT_REQ_PREFIX + index
+  );
 }
 function addVisitRequest(index, playerId, playerName) {
   const reqs = getVisitRequests(index);
@@ -148,8 +158,10 @@ function removeVisitRequest(index, playerId) {
 
 // --- 通知消息 ---
 export function getNotifications(index) {
-  const raw = world.getDynamicProperty(ISLAND_NOTIFICATIONS_PREFIX + index);
-  return raw ? JSON.parse(raw) : [];
+  return safeParseArray(
+    world.getDynamicProperty(ISLAND_NOTIFICATIONS_PREFIX + index),
+    ISLAND_NOTIFICATIONS_PREFIX + index
+  );
 }
 function setNotifications(index, notifications) {
   world.setDynamicProperty(
@@ -751,7 +763,7 @@ function showIslandSubMenu(player, backFn) {
     f.close();
     system.runTimeout(() => backFn(player), 2);
   });
-  f.show().catch((e) => console.warn("Form show failed:", e));
+  f.show().then((r) => notifyIfBusy(r, p)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // --- 成员列表 ---
@@ -781,7 +793,7 @@ function showMemberList(player, boundIndex, backFn) {
     form.close();
     system.runTimeout(() => showIslandSubMenu(player, backFn), 2);
   });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // --- 踢出确认 ---
@@ -827,7 +839,7 @@ function confirmKickMember(player, islandIndex, targetId, backFn) {
       form.close();
       system.runTimeout(() => showMemberList(player, islandIndex, backFn), 2);
     });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, p)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // --- 转让选择 ---
@@ -863,7 +875,7 @@ function showTransferSelect(player, boundIndex, backFn) {
       form.close();
       system.runTimeout(() => showIslandSubMenu(player, backFn), 2);
     });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // --- 消息中心 ---
@@ -918,7 +930,7 @@ function showNotificationCenter(player, boundIndex, backFn) {
       form.close();
       system.runTimeout(() => showIslandSubMenu(player, backFn), 2);
     });
-    form.show().catch((e) => console.warn("Form show failed:", e));
+    form.show().then((r) => notifyIfBusy(r, p)).catch((e) => console.warn("Form show failed:", e));
     return;
   }
 
@@ -1052,7 +1064,7 @@ function showNotificationCenter(player, boundIndex, backFn) {
     form.close();
     system.runTimeout(() => showIslandSubMenu(player, backFn), 2);
   });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, p)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // --- 放弃岛屿确认 ---
@@ -1077,7 +1089,7 @@ function showAbandonConfirm(player, boundIndex, backFn) {
       form.close();
       system.runTimeout(() => showIslandSubMenu(player, backFn), 2);
     });
-  form.show().catch((e) => console.warn("Form show failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Form show failed:", e));
 }
 
 // ============================================================
@@ -1106,10 +1118,12 @@ export function init() {
     const b = getIslandBoundary(boundIndex);
     const limit = ISLAND_BOUNDARY_LIMIT;
 
-    // 超出上限的放置不扩展边界（静默处理，不打扰玩家），避免重置范围爆炸
+    // 超出上限的放置不扩展边界（静默处理，不打扰玩家），避免重置范围爆炸。
+    // y 用区间判据：上限是"可写层"511，下限是维度底部 -64（用 abs 比较会把两者混为一谈）
     if (
       Math.max(Math.abs(x), Math.abs(z)) > limit ||
-      Math.abs(y) > ISLAND_BOUNDARY_LIMIT_Y
+      y < ISLAND_DIMENSION_MIN_Y ||
+      y > ISLAND_BUILD_MAX_Y
     ) {
       return;
     }
@@ -1196,7 +1210,8 @@ async function performIslandReset(index) {
   const z1 = Math.max(-limit, boundary.zMin);
   const z2 = Math.min(limit, boundary.zMax);
   const y1 = Math.max(ISLAND_DIMENSION_MIN_Y, boundary.yMin);
-  const y2 = Math.min(ISLAND_DIMENSION_MAX_Y, boundary.yMax);
+  // 上界用 ISLAND_BUILD_MAX_Y(511)：512 是只读边界层，/fill 到它会整段失败
+  const y2 = Math.min(ISLAND_BUILD_MAX_Y, boundary.yMax);
   if (x1 > x2 || z1 > z2 || y1 > y2) {
     setIslandStatus(index, "dirty");
     world.setDynamicProperty(ISLAND_RESET_SCHEDULE_PREFIX + index, undefined);
@@ -1208,6 +1223,11 @@ async function performIslandReset(index) {
   const manager = world.tickingAreaManager;
   const areaName = `island_reset_${index}`;
   const air = "minecraft:air";
+
+  // 清理质量统计：只要有瓦片被跳过或 fill 失败，就绝不能宣告"重置完成"，
+  // 否则上一任玩家的建筑/容器会残留给下一任（等价物品复制）。
+  let skippedTiles = 0;
+  let failedFills = 0;
 
   // 按 32×32 瓦片滚动：临时常加载 → 等待区块加载 → 分 y 段 fill → 移除区域
   for (let tx = x1; tx <= x2; tx += 32) {
@@ -1222,12 +1242,20 @@ async function performIslandReset(index) {
       try {
         if (!manager.hasTickingArea(areaName)) {
           if (!manager.hasCapacity(tileOptions)) {
-            console.warn(`[Island] 重置瓦片 ${tx},${tz} 超出区块预算，跳过`);
+            console.warn(
+              `[Island] 重置瓦片 ${tx},${tz} 超出区块预算，跳过（记为未完成）`
+            );
+            skippedTiles++;
             continue;
           }
-          await manager.createTickingArea(areaName, tileOptions);
+          // 超时保护：createTickingArea 不 resolve 时不能把整次重置永久卡住
+          await withTimeout(
+            manager.createTickingArea(areaName, tileOptions),
+            100,
+            `createTickingArea(${areaName} @${tx},${tz})`
+          );
         }
-        await system.waitTicks(30); // 等待区块加载
+        await withTimeout(system.waitTicks(30), 60, `waitTicks(30) @${tx},${tz}`); // 等待区块加载
         for (let y = y1; y <= y2; y += 32) {
           const fy = Math.min(y + 31, y2);
           try {
@@ -1239,12 +1267,14 @@ async function performIslandReset(index) {
               air
             );
           } catch (e) {
+            failedFills++;
             console.warn(`[Island] 重置 fill 失败 ${tx},${y},${tz}: ${e}`);
           }
-          await system.waitTicks(1);
+          await withTimeout(system.waitTicks(1), 20, `waitTicks(1) @${tx},${y},${tz}`);
         }
         manager.removeTickingArea(areaName);
       } catch (e) {
+        failedFills++;
         console.error(`[Island] 重置瓦片失败 ${tx},${tz}: ${e}`);
         try {
           manager.removeTickingArea(areaName);
@@ -1254,24 +1284,49 @@ async function performIslandReset(index) {
   }
 
   // 清理残留实体（仅限本岛屿维度，保留玩家）：
-  // 传送到自身 xz 坐标、y=-104 的虚空，实体掉出世界自然移除，
-  // 避免 kill 触发掉落物生成或史莱姆分裂等残留
+  // 直接 remove() —— 不产生掉落物、不触发史莱姆分裂，也不依赖越界传送
+  // （旧的 y=-104 传送在 min_y=-64 的维度里本就是无效路径）
+  let cleanedEntities = 0;
+  let failedEntities = 0;
   try {
     for (const ent of dim.getEntities({
       excludeTypes: ["minecraft:player"],
     })) {
       try {
-        const loc = ent.location;
-        ent.teleport({ x: loc.x, y: -104, z: loc.z });
-      } catch (e) {}
+        ent.remove();
+        cleanedEntities++;
+      } catch (e) {
+        failedEntities++;
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error(`[Island] 重置实体清理失败 #${index}: ${e}`);
+  }
+  if (failedEntities > 0) {
+    console.warn(`[Island] 重置 #${index} 有 ${failedEntities} 个实体未能移除`);
+  }
+
+  world.setDynamicProperty(ISLAND_RESET_SCHEDULE_PREFIX + index, undefined);
+
+  if (skippedTiles > 0 || failedFills > 0 || failedEntities > 0) {
+    // 不完整 → 保持 dirty：不清边界（便于重跑覆盖同一范围）、不开放给下一位玩家
+    setIslandStatus(index, "dirty");
+    console.error(
+      `[Island] 岛屿 #${index} 重置不完整：跳过瓦片 ${skippedTiles}、fill 失败 ${failedFills} 段、实体失败 ${failedEntities} 个；` +
+        `已保持 dirty 待管理员处理（不清空边界）`
+    );
+    world.sendMessage(
+      `§c岛屿 #${index} 自动重置未完成（跳过 ${skippedTiles} / 失败 ${failedFills}），已标记待处理，请联系管理员`
+    );
+    return;
+  }
 
   // 边界重置，进入待确认状态（管理员人工兜底开放）
   resetIslandBoundary(index);
-  world.setDynamicProperty(ISLAND_RESET_SCHEDULE_PREFIX + index, undefined);
   setIslandStatus(index, "review");
-  world.sendMessage(`§a岛屿 #${index} 自动重置完成，等待管理员确认开放`);
+  world.sendMessage(
+    `§a岛屿 #${index} 自动重置完成（清理实体 ${cleanedEntities} 个），等待管理员确认开放`
+  );
 }
 
 // ============================================================

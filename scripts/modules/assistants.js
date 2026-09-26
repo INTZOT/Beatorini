@@ -4,6 +4,7 @@
 // 2. 工具自动补充（工具损坏后自动替换同种工具）
 // 3. 刷石机工具自动选择（生成矿石时自动切换最低级可挖掘工具）
 // ============================================================
+import { notifyIfBusy } from "../lib/form.js";
 import { system, world } from "@minecraft/server";
 import { CustomForm, ObservableBoolean } from "@minecraft/server-ui";
 
@@ -147,7 +148,7 @@ export function showAssistantMenu(player, backFn) {
       form.close();
       system.runTimeout(() => backFn(player), 2);
     });
-  form.show().catch((e) => console.warn("Assistant menu failed:", e));
+  form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Assistant menu failed:", e));
 }
 
 // ============================================================
@@ -163,7 +164,9 @@ export function autoSelectPickaxe(player, blockTypeId) {
 
   const selectedSlot = player.selectedSlotIndex;
   const held = inv.getItem(selectedSlot);
-  const heldLevel = held ? PICKAXE_LEVEL[held.typeId] : -1;
+  // 非镐物品时 PICKAXE_LEVEL[...] 为 undefined，而 undefined 参与 < 比较恒为 false
+  // → 旧写法会让整个自动切镐逻辑变成空操作（静默失效）
+  const heldLevel = (held && PICKAXE_LEVEL[held.typeId]) ?? -1;
   if (heldLevel === required) return; // 当前工具恰好满足
 
   // 从所需等级开始找最低级合适镐（链内等级越低越优先）

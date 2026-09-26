@@ -105,8 +105,15 @@ export function giveItemToPlayer(player, typeId, amount, itemProps) {
 
       const leftover = inv.addItem(stack);
       if (leftover) {
-        player.dimension.spawnItem(leftover, player.location);
-        anyDropped = true;
+        try {
+          player.dimension.spawnItem(leftover, player.location);
+          anyDropped = true;
+        } catch (e) {
+          console.error(
+            `[Inventory] 背包满且掉落失败（itemProps 分支）：${typeId} x${leftover.amount}（${e}）`
+          );
+          return false;
+        }
       }
     }
     if (anyDropped) {
@@ -116,12 +123,46 @@ export function giveItemToPlayer(player, typeId, amount, itemProps) {
   }
 
   // 普通可堆叠物品
-  const stack = new ItemStack(typeId, amount);
-  if (itemProps?.nameTag) stack.nameTag = itemProps.nameTag;
-  if (itemProps?.lore?.length > 0) stack.setLore(itemProps.lore);
-  const leftover = inv.addItem(stack);
-  if (leftover) {
-    player.dimension.spawnItem(leftover, player.location);
+  // 注意：new ItemStack(typeId, amount) 在 amount > 255 时**直接抛错**，65..255 会被静默夹取，
+  // 所以必须按物品的最大堆叠数拆分后再塞背包。
+  let remaining = amount;
+  let anyLeft = false;
+  while (remaining > 0) {
+    let maxAmount = 64;
+    try {
+      maxAmount = new ItemStack(typeId, 1).maxAmount || 64;
+    } catch (e) {
+      console.error(`[Inventory] 无效物品 ID：${typeId}（${e}）`);
+      return false;
+    }
+    const chunk = Math.min(remaining, maxAmount);
+    remaining -= chunk;
+
+    let stack;
+    try {
+      stack = new ItemStack(typeId, chunk);
+    } catch (e) {
+      console.error(`[Inventory] 构造物品失败：${typeId} x${chunk}（${e}）`);
+      return false;
+    }
+    if (itemProps?.nameTag) stack.nameTag = itemProps.nameTag;
+    if (itemProps?.lore?.length > 0) stack.setLore(itemProps.lore);
+
+    const leftover = inv.addItem(stack);
+    if (leftover) {
+      // 掉落失败绝不能静默：物品只存在于脚本变量里，抛错即永久消失
+      try {
+        player.dimension.spawnItem(leftover, player.location);
+        anyLeft = true;
+      } catch (e) {
+        console.error(
+          `[Inventory] 背包满且掉落失败，物品未发放：${typeId} x${leftover.amount}（${e}）`
+        );
+        return false;
+      }
+    }
+  }
+  if (anyLeft) {
     player.sendMessage("§e背包已满，部分物品掉落在脚下");
   }
   return true;

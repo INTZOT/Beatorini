@@ -4,6 +4,7 @@
 // 首个奖池：刷怪蛋奖池（86 种原版刷怪蛋，单抽 100,000 金币）
 // 硬保底：10 抽必出史诗（含）以上，100 抽必出传说；抽中对应稀有度即重置计数
 // ============================================================
+import { notifyIfBusy } from "../lib/form.js";
 import { system, world, ItemStack } from "@minecraft/server";
 import { CustomForm } from "@minecraft/server-ui";
 import { getPlayerMoney } from "./money.js";
@@ -351,8 +352,17 @@ function pickReward(pool, minIndex = 0) {
     (rarity, i) =>
       i >= minIndex && pool.rewards.some((r) => r.rarity === rarity)
   );
-  // 奖池内没有对应稀有度时回退到全奖池抽取
-  if (eligibleRarities.length === 0) return pickReward(pool, 0);
+  // 奖池内没有对应稀有度时回退到全奖池抽取；
+  // 但若连 minIndex=0 都匹配不到（奖池为空/稀有度拼错），必须中止而不是无限递归爆栈
+  if (eligibleRarities.length === 0) {
+    if (minIndex === 0) {
+      console.warn(
+        `[Lottery] 奖池 ${pool?.id ?? "?"} 找不到任何已知稀有度，本次抽取返回空（请检查奖池数据）`
+      );
+      return undefined;
+    }
+    return pickReward(pool, 0);
+  }
 
   const total = eligibleRarities.reduce(
     (sum, rarity) => sum + RARITY[rarity].weight,
@@ -386,25 +396,69 @@ function playRaritySound(player, rarity) {
   } catch (e) {}
 }
 
-/** 发放奖励，返回因背包满而掉落的数量 */
+/**
+ * 发放奖励：先塞背包，塞不下的**掉在玩家脚下**（与 UI 提示一致），返回掉落数量。
+ * 修复点：旧实现把 `addItem` 返回的 leftover 直接丢掉 —— 背包满时玩家照扣金币却什么也拿不到，
+ * 界面还提示"掉落在你脚下"（付费奖励静默蒸发）。
+ */
 function giveReward(player, reward) {
+  let leftover;
   try {
-    const inv = player.getComponent("inventory").container;
-    const leftover = inv.addItem(
-      new ItemStack(reward.typeId, reward.count ?? 1)
-    );
-    return leftover?.amount ?? 0;
+    const inv = player.getComponent("inventory")?.container;
+    if (!inv) throw new Error("找不到背包容器");
+    leftover = inv.addItem(new ItemStack(reward.typeId, reward.count ?? 1));
   } catch (e) {
-    console.warn(`[Lottery] 发放 ${reward.typeId} 失败: ${e}`);
-    return 0;
+    console.warn(`[Lottery] 发放 ${reward.typeId} x${reward.count ?? 1} 失败: ${e}`);
+    // 抛给调用方 → 退款，避免"扣钱不给东西"
+    throw new Error(`发放 ${reward.typeId} 失败`);
+  }
+  if (!leftover) return 0;
+
+  try {
+    player.dimension.spawnItem(leftover, player.location);
+    return leftover.amount;
+  } catch (e) {
+    console.warn(
+      `[Lottery] 背包已满且掉落失败（${reward.typeId} x${leftover.amount}）：${e}`
+    );
+    // 掉落也失败 → 视为发放失败，交由调用方退款
+    throw new Error(`掉落 ${reward.typeId} 失败`);
   }
 }
 
 function deductMoney(player, amount) {
   const money = getPlayerMoney(player);
   if (money < amount) return false;
-  player.runCommand(`scoreboard players set @s money ${money - amount}`);
-  return true;
+  try {
+    const res = player.runCommand(
+      `scoreboard players set @s money ${money - amount}`
+    );
+    // 命令"没生效"时未必抛错，只返回 successCount=0 → 必须校验，否则等于"免费抽奖"
+    if ((res?.successCount ?? 0) < 1) {
+      console.error(`[Lottery] 扣款未生效：${amount}（${player.name ?? player.id}）`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error(`[Lottery] 扣款抛错（${amount}）：${e}`);
+    return false;
+  }
+}
+
+/** 退款（发放失败时使用），未生效会明确告警而不是静默吞掉 */
+function refundMoney(player, amount, reason) {
+  const value = Math.round(amount);
+  if (!Number.isFinite(value) || value <= 0) return;
+  try {
+    const res = player.runCommand(`scoreboard players add @s money ${value}`);
+    if ((res?.successCount ?? 0) < 1) {
+      console.error(
+        `[Lottery] 退款未生效（${reason}）：${value} → ${player.name ?? player.id}`
+      );
+    }
+  } catch (e) {
+    console.error(`[Lottery] 退款抛错（${reason}）：${e}`);
+  }
 }
 
 // ============================================================
@@ -480,7 +534,15 @@ function drawOnce(player, pool, backFn) {
     return;
   }
   const drawn = drawOneWithPity(player, pool);
-  const dropped = giveReward(player, drawn.reward);
+  let dropped = 0;
+  try {
+    dropped = giveReward(player, drawn.reward);
+  } catch (e) {
+    // 发放失败 → 全额退款，避免"扣了钱什么也没拿到"
+    refundMoney(player, cost, `单抽发放失败 ${drawn.reward.typeId}`);
+    player.sendMessage("§c奖励发放失败，已全额退款，请清出背包空间后重试");
+    return;
+  }
   playRaritySound(player, drawn.reward.rarity);
   showDrawResultForm(player, pool, [drawn], dropped, false, backFn);
 }
@@ -500,8 +562,21 @@ function drawTen(player, pool, backFn) {
   }
 
   let dropped = 0;
+  let failedCount = 0;
   for (const drawn of results) {
-    dropped += giveReward(player, drawn.reward);
+    try {
+      dropped += giveReward(player, drawn.reward);
+    } catch (e) {
+      failedCount++;
+    }
+  }
+  if (failedCount > 0) {
+    // 按件均摊退款，避免"扣了十连的钱、少给若干件"
+    const refund = Math.floor(cost / TEN_PULL_COUNT) * failedCount;
+    refundMoney(player, refund, `十连 ${failedCount} 件发放失败`);
+    player.sendMessage(
+      `§c有 §e${failedCount}§c 件奖励发放失败，已退款 §6${formatNumber(refund)}§c 金币（请清出背包空间）`
+    );
   }
 
   const bestIndex = Math.max(
@@ -568,7 +643,7 @@ function showDrawResultForm(player, pool, results, dropped, isTen, backFn) {
     f.close();
     system.runTimeout(() => showPoolMenu(player, pool, backFn), 2);
   });
-  f.show().catch((e) => console.warn("Lottery result form failed:", e));
+  f.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Lottery result form failed:", e));
 }
 
 function showPoolMenu(player, pool, backFn) {
@@ -609,7 +684,7 @@ function showPoolMenu(player, pool, backFn) {
     f.close();
     system.runTimeout(() => showLotteryMenu(player, backFn), 2);
   });
-  f.show().catch((e) => console.warn("Lottery pool form failed:", e));
+  f.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Lottery pool form failed:", e));
 }
 
 function showPoolDetailsForm(player, pool, backFn) {
@@ -649,7 +724,7 @@ function showPoolDetailsForm(player, pool, backFn) {
     f.close();
     system.runTimeout(() => showPoolMenu(player, pool, backFn), 2);
   });
-  f.show().catch((e) => console.warn("Lottery pool details form failed:", e));
+  f.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Lottery pool details form failed:", e));
 }
 
 export function showLotteryMenu(player, backFn = () => {}) {
@@ -674,7 +749,7 @@ export function showLotteryMenu(player, backFn = () => {}) {
     f.close();
     system.runTimeout(() => backFn(player), 2);
   });
-  f.show().catch((e) => console.warn("Lottery menu failed:", e));
+  f.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Lottery menu failed:", e));
 }
 
 export function init() {}

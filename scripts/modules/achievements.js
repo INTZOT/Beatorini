@@ -72,8 +72,10 @@ export const ACHIEVEMENTS = [
 ];
 
 export function getAchievements(playerId) {
-  const raw = world.getDynamicProperty(ACHIEVEMENT_PREFIX + playerId);
-  return raw ? JSON.parse(raw) : [];
+  return safeParseArray(
+    world.getDynamicProperty(ACHIEVEMENT_PREFIX + playerId),
+    ACHIEVEMENT_PREFIX + playerId
+  );
 }
 
 export function saveAchievement(playerId, itemType) {
@@ -88,22 +90,39 @@ export function init() {
   // --- 成就检测（每3秒检查玩家背包） ---
   system.runInterval(() => {
     for (const player of world.getPlayers()) {
-      const completed = getAchievements(player.id);
+      const completed = new Set(getAchievements(player.id));
       if (!player.getComponent("minecraft:inventory")) continue;
       const inv = player.getComponent("minecraft:inventory").container;
-      for (const ach of ACHIEVEMENTS) {
-        if (completed.includes(ach.item)) continue;
-        let hasItem = false;
-        for (let slot = 0; slot < inv.size; slot++) {
+      // 先扫一遍背包建 typeId 集合：原来对每件成就都完整扫一次背包（68×36 次 getItem）
+      const owned = new Set();
+      for (let slot = 0; slot < inv.size; slot++) {
+        try {
           const stack = inv.getItem(slot);
-          if (stack?.typeId === ach.item) {
-            hasItem = true;
-            break;
+          if (stack?.typeId) owned.add(stack.typeId);
+        } catch (e) {}
+      }
+      for (const ach of ACHIEVEMENTS) {
+        if (completed.has(ach.item)) continue;
+        if (!owned.has(ach.item)) continue;
+        // 先发钱、确认生效后再落库：旧顺序（先落库后发钱）一旦发钱失败，
+        // 成就业已记录 → 永远不会再触发，玩家静默损失奖励
+        try {
+          const res = player.runCommand(
+            `scoreboard players add @s money ${ach.reward}`
+          );
+          if ((res?.successCount ?? 0) < 1) {
+            console.warn(
+              `[Achievements] ${ach.name} 奖励发放未生效，本次不记录成就，下轮重试（${player.name ?? player.id}）`
+            );
+            continue;
           }
+        } catch (e) {
+          console.warn(
+            `[Achievements] ${ach.name} 奖励发放抛错，本次不记录成就：${e}`
+          );
+          continue;
         }
-        if (!hasItem) continue;
         saveAchievement(player.id, ach.item);
-        player.runCommand(`scoreboard players add @s money ${ach.reward}`);
         const msg = `§6[成就] §e${player.name} §a获得了成就 §l§6${ach.name}§r §a金币+${ach.reward}`;
         world.sendMessage(msg);
         player.playSound("random.levelup");
