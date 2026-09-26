@@ -149,8 +149,25 @@ export function getVaultEntities() {
 function ensureVaultEntities() {
   const existing = getVaultEntities();
   const map = getVaultIndexMap();
-  const used = new Set(Object.values(map).filter((v) => Number.isInteger(v)));
   let changed = false;
+
+  // 清理悬空索引条目。
+  // 索引映射按实体 uniqueId 记录，而金库实体只在内存中存在（金库维度区块从未落盘），
+  // 每次重启都会丢失。旧索引若留在 map 里就会永久占住 0/1 号，下面的补建循环因此
+  // 认为"已存在"而不再生成实体 —— 金库从此再也起不来，且全程无任何日志。
+  const liveIds = new Set();
+  for (const e of existing) {
+    const id = entityId(e);
+    if (id !== null) liveIds.add(id);
+  }
+  for (const id of Object.keys(map)) {
+    if (!liveIds.has(id)) {
+      delete map[id];
+      changed = true;
+    }
+  }
+
+  const used = new Set(Object.values(map).filter((v) => Number.isInteger(v)));
 
   for (const e of existing) {
     const id = entityId(e);
