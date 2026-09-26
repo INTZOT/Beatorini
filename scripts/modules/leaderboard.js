@@ -158,12 +158,20 @@ function clearBoardConfig(categoryKey) {
 function clearCategoryShapes(categoryKey) {
   const board = boards.get(categoryKey);
   if (!board) return;
+  const failed = [];
   for (const shape of board.shapes) {
     try {
       world.primitiveShapesManager.removeText(shape);
-    } catch (e) {}
+    } catch (e) {
+      failed.push(shape);
+      console.warn(`[Leaderboard] 移除悬浮榜形状失败（${categoryKey}）：${e}`);
+    }
   }
-  boards.delete(categoryKey);
+  if (failed.length > 0) {
+    boards.set(categoryKey, { shapes: failed });
+  } else {
+    boards.delete(categoryKey);
+  }
 }
 
 /** 生成单块排行榜文本（\n 多行 + § 颜色） */

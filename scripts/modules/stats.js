@@ -82,7 +82,10 @@ export function bindPlayerName(player) {
   if (!player || !player.id || !player.name) return;
   try {
     world.setDynamicProperty(PLAYER_NAME_PREFIX + player.id, player.name);
-  } catch (e) {}
+  } catch (e) {
+    // 名字映射失败会让离线玩家在排行榜/称号里显示为未知，以前完全无声
+    console.warn(`[Stats] 绑定玩家名字失败（${player.name}）：${e}`);
+  }
 }
 
 /** 读取已绑定的名字，无映射返回 undefined */
@@ -132,14 +135,20 @@ export function init() {
 
   // --- 击杀统计 ---
   world.afterEvents.entityDie.subscribe((event) => {
-    const attacker = event.damageSource?.damagingEntity;
-    if (attacker?.typeId === "minecraft:player") {
-      addStat(attacker.id, STATS_KILLS_PREFIX, 1);
-    }
+    // 伤害来源可能是"同 tick 已消失"的实体（投射物主人、自爆生物）：
+    // 裸读 typeId 会抛 InvalidEntityError 并中断整个处理器，导致本次统计静默丢失
+    try {
+      const attacker = event.damageSource?.damagingEntity;
+      if (attacker?.isValid && attacker.typeId === "minecraft:player") {
+        addStat(attacker.id, STATS_KILLS_PREFIX, 1);
+      }
+    } catch (e) {}
     // 玩家死亡统计
-    if (event.deadEntity?.typeId === "minecraft:player") {
-      addStat(event.deadEntity.id, STATS_DEATHS_PREFIX, 1);
-    }
+    try {
+      if (event.deadEntity?.typeId === "minecraft:player") {
+        addStat(event.deadEntity.id, STATS_DEATHS_PREFIX, 1);
+      }
+    } catch (e) {}
   });
 
   // --- 挖掘统计 ---

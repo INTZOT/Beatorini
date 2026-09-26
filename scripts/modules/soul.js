@@ -7,7 +7,6 @@ import { system, world } from "@minecraft/server";
 import { LOBBY_DIMENSION_ID } from "./config.js";
 
 const SOUL_KEY = "soul:active_";
-const SOUL_OWNER_KEY = "soul:owner";
 const SOUL_MAX_RANGE = 96; // 灵魂出窍活动半径
 const active = new Map(); // playerId -> { marker, originalMode }
 
@@ -40,7 +39,6 @@ function enterSoul(player) {
       z: Math.floor(loc.z) + 0.5,
     });
     marker.nameTag = `§e${player.name} 的灵魂`;
-    marker.setDynamicProperty(SOUL_OWNER_KEY, player.id);
 
     const originalMode = String(player.getGameMode()).toLowerCase();
     world.setDynamicProperty(SOUL_KEY + player.id, marker.id);

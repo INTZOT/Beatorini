@@ -454,7 +454,13 @@ export function init() {
     const blockId = block.typeId;
 
     system.runTimeout(() => {
-      const inventory = player.getComponent("inventory").container;
+      try {
+        if (!player?.isValid) return;
+      } catch (e) {
+        return;
+      }
+      const inventory = player.getComponent("inventory")?.container;
+      if (!inventory) return;
       const slot = player.selectedSlotIndex;
       const held = inventory.getItem(slot);
 
@@ -590,6 +596,9 @@ export function init() {
 
   world.afterEvents.playerSpawn.subscribe((event) => {
     const player = event.player;
+    // 进服处理链很长（欢迎语/菜单时钟/签到表单/市场离线收益/大厅重定向）：
+    // 实体若在事件与回调之间失效，任何一次裸读都会中断整条链且无日志
+    if (!player || !player.isValid) return;
 
     if (!event.initialSpawn) return;
 
@@ -605,8 +614,15 @@ export function init() {
 
     // 玩家重连：主世界玩家不做处理；其他非空岛维度玩家传送至大厅
     const boundIndex = getPlayerBoundIndex(player.id);
+    let currentDimId;
+    try {
+      currentDimId = player.dimension.id;
+    } catch (e) {
+      console.warn(`[Spawn] 读取玩家维度失败，跳过大厅重定向（${player.name ?? player.id}）：${e}`);
+      return;
+    }
     if (
-      player.dimension.id !== LOBBY_DIMENSION_ID &&
+      currentDimId !== LOBBY_DIMENSION_ID &&
       (boundIndex === undefined ||
         !player.dimension.id.startsWith(`${DIMENSION_NAMESPACE}:void_`))
     ) {

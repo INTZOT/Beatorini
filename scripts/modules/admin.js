@@ -47,7 +47,7 @@ export function showAdminMenu(player) {
   form.show().then((r) => notifyIfBusy(r, player)).catch((e) => console.warn("Admin menu failed:", e));
 }
 
-function showIslandAdminMenu(player) {
+function showIslandAdminMenu(player, page = 0) {
   const total = getBoundCount();
   if (total === 0) {
     player.sendMessage("§c暂无岛屿数据");
@@ -69,10 +69,18 @@ function showIslandAdminMenu(player) {
     review: "待确认",
   };
 
-  const form = new CustomForm(player, "岛屿管理");
-  form.label(`§6共 ${total} 个岛屿`);
+  // 分页：每个岛屿要 4~6 个组件（状态标签 + 传送/状态按钮），
+  // 256 个岛一次性构建会得到 1000+ 组件（DDUI 表单会变得极慢甚至失败）
+  const PAGE_SIZE = 15;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(Math.max(0, Number(page) || 0), pageCount - 1);
+  const from = safePage * PAGE_SIZE + 1;
+  const to = Math.min(total, from + PAGE_SIZE - 1);
 
-  for (let i = 1; i <= total; i++) {
+  const form = new CustomForm(player, `岛屿管理（第 ${safePage + 1}/${pageCount} 页）`);
+  form.label(`§6共 ${total} 个岛屿，本页显示 #${from} ~ #${to}`);
+
+  for (let i = from; i <= to; i++) {
     form.spacer();
     const status = getIslandStatus(i) || "unknown";
     const owner = getIslandOwner(i);
@@ -115,6 +123,22 @@ function showIslandAdminMenu(player) {
         form.close();
         player.sendMessage(`§a岛屿 #${i} 已确认开放，可重新分配`);
         player.playSound("random.orb");
+      });
+    }
+  }
+
+  if (pageCount > 1) {
+    form.spacer();
+    if (safePage > 0) {
+      form.button("◀ 上一页", () => {
+        form.close();
+        system.runTimeout(() => showIslandAdminMenu(player, safePage - 1), 2);
+      });
+    }
+    if (safePage < pageCount - 1) {
+      form.button("下一页 ▶", () => {
+        form.close();
+        system.runTimeout(() => showIslandAdminMenu(player, safePage + 1), 2);
       });
     }
   }

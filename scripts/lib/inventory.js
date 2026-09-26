@@ -3,8 +3,19 @@ import { ItemStack } from "@minecraft/server";
 /**
  * 统计背包中指定物品数量
  */
+/** 取玩家背包容器；实体失效/无组件时返回 undefined（不再让调用方抛 InvalidEntityError） */
+function getContainer(player) {
+  try {
+    if (!player?.isValid) return undefined;
+    return player.getComponent("inventory")?.container;
+  } catch (e) {
+    return undefined;
+  }
+}
+
 export function countItem(player, typeId) {
-  const inventory = player.getComponent("inventory").container;
+  const inventory = getContainer(player);
+  if (!inventory) return 0;
   let total = 0;
   for (let i = 0; i < inventory.size; i++) {
     const item = inventory.getItem(i);
@@ -19,7 +30,8 @@ export function countItem(player, typeId) {
  * 从背包中移除指定数量的物品
  */
 export function removeItems(player, typeId, amount) {
-  const inventory = player.getComponent("inventory").container;
+  const inventory = getContainer(player);
+  if (!inventory) return;
   let remaining = amount;
   for (let i = 0; i < inventory.size && remaining > 0; i++) {
     const item = inventory.getItem(i);
@@ -39,8 +51,13 @@ export function removeItems(player, typeId, amount) {
 /**
  * 捕获物品属性（耐久、附魔、名称）
  */
+/**
+ * ⚠ 历史遗留：当前写返还队列时不再保存 itemProps（见 market.js），
+ * 本函数只用于读取**旧存档**里带 itemProps 的返还记录，故保留。
+ */
 export function captureItemProps(player, typeId) {
-  const inventory = player.getComponent("inventory").container;
+  const inventory = getContainer(player);
+  if (!inventory) return {};
   for (let i = 0; i < inventory.size; i++) {
     const item = inventory.getItem(i);
     if (item?.typeId === typeId) {
@@ -79,7 +96,11 @@ export function captureItemProps(player, typeId) {
  * 返还物品给玩家（支持耐久/附魔还原 + 不可堆叠物品）
  */
 export function giveItemToPlayer(player, typeId, amount, itemProps) {
-  const inv = player.getComponent("inventory").container;
+  const inv = getContainer(player);
+  if (!inv) {
+    console.error(`[Inventory] 背包不可用，物品未发放：${typeId} x${amount}`);
+    return false;
+  }
   let anyDropped = false;
 
   // 有耐久属性的物品不可堆叠，逐个创建

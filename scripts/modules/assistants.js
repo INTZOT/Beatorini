@@ -4,6 +4,7 @@
 // 2. 工具自动补充（工具损坏后自动替换同种工具）
 // 3. 刷石机工具自动选择（生成矿石时自动切换最低级可挖掘工具）
 // ============================================================
+import { safeParseObject } from "../lib/json.js";
 import { notifyIfBusy } from "../lib/form.js";
 import { system, world } from "@minecraft/server";
 import { CustomForm, ObservableBoolean } from "@minecraft/server-ui";
@@ -93,13 +94,18 @@ function ensureToolForFacingBlock(player) {
 }
 
 export function getAssistSettings(playerId) {
-  const raw = world.getDynamicProperty(ASSIST_KEY + playerId);
-  if (raw) {
-    try {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-    } catch (e) {}
+  // 读取与解析都要兜住：本函数被 2 tick 轮询和每个挖掘/放置/使用事件调用，
+  // 一次抛错就会从定时器回调冒出，三条辅助功能会一起静默停用
+  try {
+    const parsed = safeParseObject(
+      world.getDynamicProperty(ASSIST_KEY + playerId),
+      ASSIST_KEY + playerId
+    );
+    return { ...DEFAULT_SETTINGS, ...parsed };
+  } catch (e) {
+    console.warn(`[Assist] 读取辅助设置失败，使用默认值（${playerId}）：${e}`);
+    return { ...DEFAULT_SETTINGS };
   }
-  return { ...DEFAULT_SETTINGS };
 }
 
 function setAssistSettings(playerId, settings) {

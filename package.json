@@ -1,6 +1,6 @@
 {
   "name": "beatorini",
-  "version": "4.13.5",
+  "version": "4.13.6",
   "private": true,
   "description": "《灯浮市BeatoriniFI》基岩版空岛服务器行为包 —— Script API 类型定义依赖（仅用于编辑器提示 / 类型校验，不参与打包）",
   "license": "UNLICENSED",

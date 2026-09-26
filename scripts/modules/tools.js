@@ -4,7 +4,11 @@ import { getAssistSettings } from "./assistants.js";
 
 /** 自动替换工具：背包中搜索同种物品替换到快捷栏 */
 function autoReplaceTool(player, typeId) {
-  const inventory = player.getComponent("inventory").container;
+  // 这些调用都发生在 runTimeout 回调里：异常不会被外层 catch 捕获，
+  // 玩家若在那一 tick 内退出/死亡，`getComponent` 会抛 InvalidEntityError 并让功能静默失效
+  if (!player?.isValid) return;
+  const inventory = player.getComponent("inventory")?.container;
+  if (!inventory) return;
   const selectedSlot = player.selectedSlotIndex;
 
   for (let i = 0; i < inventory.size; i++) {
@@ -33,7 +37,13 @@ export function init() {
     if (itemStackAfterBreak) return;
 
     const typeId = itemStackBeforeBreak.typeId;
-    system.runTimeout(() => autoReplaceTool(player, typeId), 1);
+    system.runTimeout(() => {
+      try {
+        autoReplaceTool(player, typeId);
+      } catch (e) {
+        console.warn(`[Tools] 自动补工具失败（${player?.name ?? "?"}）：${e}`);
+      }
+    }, 1);
   });
 
   // 使用物品后检查工具是否损坏（锄头耕地、斧头去皮等）
@@ -45,10 +55,16 @@ export function init() {
 
     const typeId = itemStack.typeId;
     system.runTimeout(() => {
-      const inventory = player.getComponent("inventory").container;
-      const held = inventory.getItem(player.selectedSlotIndex);
-      if (held) return;
-      autoReplaceTool(player, typeId);
+      try {
+        if (!player?.isValid) return;
+        const inventory = player.getComponent("inventory")?.container;
+        if (!inventory) return;
+        const held = inventory.getItem(player.selectedSlotIndex);
+        if (held) return;
+        autoReplaceTool(player, typeId);
+      } catch (e) {
+        console.warn(`[Tools] 使用后补工具失败（${player?.name ?? "?"}）：${e}`);
+      }
     }, 1);
   });
 }

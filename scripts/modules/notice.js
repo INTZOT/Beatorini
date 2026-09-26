@@ -50,12 +50,21 @@ function saveNotices(list) {
 function clearShapes(id) {
   const shapes = noticeShapes.get(id);
   if (!shapes) return;
+  const failed = [];
   for (const shape of shapes) {
     try {
       world.primitiveShapesManager.removeText(shape);
-    } catch (e) {}
+    } catch (e) {
+      // 移除失败就保留句柄（否则形状残留在世界里，且永远拿不回来、白占 1000 个形状配额）
+      failed.push(shape);
+      console.warn(`[Notice] 移除公告形状失败（#${id}）：${e}`);
+    }
   }
-  noticeShapes.delete(id);
+  if (failed.length > 0) {
+    noticeShapes.set(id, failed);
+  } else {
+    noticeShapes.delete(id);
+  }
 }
 
 function renderNotice(entry) {
@@ -204,7 +213,9 @@ function showNoticeEditor(player, notice, backFn) {
   const colorObs = new ObservableNumber(notice?.colorIndex ?? 0, {
     clientWritable: true,
   });
-  const bgObs = new ObservableBoolean(notice?.background ?? true, {
+  // 与渲染侧保持一致：渲染对缺失 background 的旧数据按"无背景"处理，
+  // 编辑器旧写法默认 true → 旧公告一进编辑界面就"凭空多出背景"
+  const bgObs = new ObservableBoolean(notice ? (notice.background ?? false) : true, {
     clientWritable: true,
   });
   const bgAlphaObs = new ObservableNumber(

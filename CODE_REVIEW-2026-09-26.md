@@ -236,13 +236,23 @@ return leftover?.amount ?? 0;      // ← leftover 从未 spawnItem
   - ⚠️ 过程记录：第一版推导成 `W + (CAP-W)·k` 得到 235000/272500/…，与原值 240000/280000/300000/310000 **不同** —— 属于会静默改动回收经济的错误，已回退为 `W·1.5/1.75/1.875/1.9375` 并在本地用脚本断言与旧值完全相等
 - 死代码：删除 `menus.js` 未使用的 `spawnDim`
 
-### ⏳ 仍未做（低优先级，记录在案）
+### ✅ 低优先级项（2026-09-26 第三批，已全部处理）
 
-- `admin.js` 岛屿列表分页（最坏 256 岛 × 4~6 组件；当前仍一次性构建）
-- `lib/inventory.js` 的 `captureItemProps` 死代码路径（保留，仅服务旧存档数据）
-- `mob-density` 的位置过滤优化（已加 `isValid` 守卫，未改成按玩家中心查询）
-- `notice.js` 中 `background` 默认值在编辑器(true)与渲染(false)不一致（旧数据首次编辑会"凭空多出背景"，纯表现层）
-- `stats` 其余计数（击杀/挖掘等）仍是事件级读改写（量级远小于原在线时长写入）
+| 项 | 修复 |
+|---|---|
+| `admin.js` 岛屿列表分页 | 每页 15 个岛 + 上一页/下一页；标题显示"第 N/M 页"（原先 256 岛会一次性构建 1000+ 组件） |
+| `tools.js` 自动补工具 | `runTimeout` 回调加 `isValid`/容器守卫 + try/catch（原先玩家掉线即静默失效） |
+| `menus.js` 进服处理链 | `playerSpawn` 加 `isValid` 守卫、维度读取包 try/catch（原先一次抛错会跳过欢迎语/菜单时钟/签到/市场离线收益/大厅重定向整条链）；快捷栏补货回调同样加守卫 |
+| `island.js` 下拉取值 | 消息中心 3 处 + 转账目标 1 处改用 `validIndex()`（客户端可写下标越界不再抛 TypeError） |
+| TextPrimitive 句柄 | `notice.js` / `leaderboard.js` 移除失败时**保留句柄待重试**（原先句柄被丢弃 → 形状永久残留且占配额）；`chatbubble.js` 移除失败改为告警 |
+| `chatbubble.js` 文本 | 截断到 128 字符 + 去除 `§` 颜色码（超长会导致该条气泡构造失败而丢失） |
+| `lib/inventory.js` 库层守卫 | 新增 `getContainer()`：`countItem`/`removeItems`/`captureItemProps`/`giveItemToPlayer` 全部接入；`captureItemProps` 加注释说明只服务旧存档数据 |
+| `stats.js` | 击杀统计加失效实体守卫（`isValid` + try/catch）；名字映射写入失败改为告警 |
+| `assistants.js` | `getAssistSettings` 的 DP 读取与解析整体兜底（原先读取在 try 之外，一次异常会让三条辅助功能一起停用） |
+| `notice.js` 背景默认值 | 编辑器对旧数据改为与渲染一致的"无背景"，不再"一进编辑就凭空多出背景" |
+| `soul.js` | 删除只写不读的 `soul:owner` 死写入 |
+
+**明确不修改（有意保留）**：`mob-density` 的整维度扫描（该功能语义就是"清掉全维度里任何位置的富集怪"，改成按玩家范围会失去意义）；`stats` 其余计数（击杀/挖掘等）维持事件级读改写（量级远小于原每秒在线时长写入）。
 
 ### 最终验证（BDS 1.26.51.1 + 生产世界副本）
 

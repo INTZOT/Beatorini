@@ -25,7 +25,9 @@ function removeBubbles(playerId) {
     if (entry.shape) {
       try {
         world.primitiveShapesManager.removeText(entry.shape);
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[ChatBubble] 移除气泡失败（可能残留到玩家下线）：${e}`);
+      }
     }
   }
 }
@@ -35,7 +37,9 @@ function renderBubbles(player, data) {
     if (entry.shape) {
       try {
         world.primitiveShapesManager.removeText(entry.shape);
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[ChatBubble] 移除气泡失败（可能残留到玩家下线）：${e}`);
+      }
       entry.shape = undefined;
     }
   }
@@ -66,6 +70,10 @@ function renderBubbles(player, data) {
 
 export function addChatBubble(player, text) {
   if (!player || !text) return;
+  // TextPrimitive 每行上限 128 字符：聊天文本不截断会导致该条气泡构造抛错而丢失；
+  // 同时去掉 § 颜色码（气泡统一白色，避免玩家用颜色码刷屏）
+  text = String(text).replace(/\u00a7./g, "").slice(0, 128);
+  if (!text) return;
   let data = bubbles.get(player.id);
   if (!data) {
     data = { entries: [], timer: undefined };

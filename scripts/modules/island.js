@@ -1,4 +1,4 @@
-import { notifyIfBusy } from "../lib/form.js";
+import { notifyIfBusy, validIndex } from "../lib/form.js";
 import {
   system,
   world,
@@ -865,7 +865,12 @@ function showTransferSelect(player, boundIndex, backFn) {
     .dropdown("目标成员", transferTarget, transferOptions)
     .spacer()
     .button("确认转让", () => {
-      const targetId = transferIdMap[transferTarget.getData()];
+      const targetIdx = validIndex(transferTarget.getData(), transferIdMap.length);
+      if (targetIdx === undefined) {
+        player.sendMessage("§c选择无效，请重试");
+        return;
+      }
+      const targetId = transferIdMap[targetIdx];
       const targetName = getPlayerNameById(targetId);
       form.close();
       system.runTimeout(() => handleTransfer(player, targetName), 2);
@@ -940,8 +945,9 @@ function showNotificationCenter(player, boundIndex, backFn) {
 
   form.spacer();
   form.button("同意", () => {
-    const idx = dropdownValue.getData();
-    if (idx === 0) {
+    // 下拉值是客户端可写的：越界时 items[idx-1] 为 undefined → item.type 抛错（表单已关，无日志）
+    const idx = validIndex(dropdownValue.getData(), items.length + 1);
+    if (idx === undefined || idx === 0) {
       player.sendMessage("§c请先选择一条消息");
       return;
     }
@@ -1006,8 +1012,9 @@ function showNotificationCenter(player, boundIndex, backFn) {
 
   form.spacer();
   form.button("拒绝", () => {
-    const idx = dropdownValue.getData();
-    if (idx === 0) {
+    // 下拉值是客户端可写的：越界时 items[idx-1] 为 undefined → item.type 抛错（表单已关，无日志）
+    const idx = validIndex(dropdownValue.getData(), items.length + 1);
+    if (idx === undefined || idx === 0) {
       player.sendMessage("§c请先选择一条消息");
       return;
     }
@@ -1040,8 +1047,9 @@ function showNotificationCenter(player, boundIndex, backFn) {
 
   form.spacer();
   form.button("确认清除", () => {
-    const idx = dropdownValue.getData();
-    if (idx === 0) {
+    // 下拉值是客户端可写的：越界时 items[idx-1] 为 undefined → item.type 抛错（表单已关，无日志）
+    const idx = validIndex(dropdownValue.getData(), items.length + 1);
+    if (idx === undefined || idx === 0) {
       player.sendMessage("§c请先选择一条消息");
       return;
     }
