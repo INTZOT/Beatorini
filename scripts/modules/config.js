@@ -136,4 +136,11 @@ export const MARKET_VAULT_AREA_CHUNKS = 2;
 export const MARKET_VAULT_COUNT_KEY = "market:vault_count";
 export const MARKET_VAULT_INDEX_KEY = "market:vault_index";
 export const MARKET_VAULT_INDEX_MAP_KEY = "market:vault_index_map"; // 实体 uniqueId → 索引（世界级映射；实体自身动态属性可能丢失/损坏，不可依赖）
-export const MARKET_VAULT_TICKINGAREA = "beatorini_market_vault";
+// 2026-09-26 更名为 _v2。
+// 原名字对应的 ticking area 记录残留在世界存档里，让 setupVault 里的
+// hasTickingArea() 恒为 true，于是创建分支被跳过 —— 但那条记录实际并没有让
+// island:vault 的区块保持加载，结果是 spawnEntity 抛 LocationInUnloadedChunkError，
+// 金库实体永远建不出来，且全程无日志。
+// 换名可让 hasTickingArea() 返回 false，强制走一次全新创建。
+// 旧记录成为无害孤儿（不再被引用），后续可用 removeTickingArea 清理。
+export const MARKET_VAULT_TICKINGAREA = "beatorini_market_vault_v2";
