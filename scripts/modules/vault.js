@@ -2,6 +2,13 @@
 // 市场金库：自定义实体容器无损存储
 // 使用带 minecraft:inventory 的自定义实体（beatorini:market_vault）
 // 保存完整 ItemStack，避免 JSON 序列化丢失 NBT（附魔/名称/耐久等）。
+//
+// ⚠ 实体索引解析（2026-08 修复）：
+//   实体自身动态属性（market:vault_index）在部分存档中会丢失/损坏
+//   （值为 0.125 等非整数，或直接缺失），旧代码 `?? 0` 回退会把所有
+//   实体当成索引 0 → 槽位引用互相冲突 → 买家拿到“下一件”物品、孤儿物品。
+//   现在以【世界级映射 market:vault_index_map（uniqueId → 索引）】为准，
+//   缺失/损坏的实体动态属性只作为迁移来源，绝不回退到 0。
 // ============================================================
 import { system, world, ItemStack } from "@minecraft/server";
 import {
@@ -16,6 +23,7 @@ import {
   MARKET_VAULT_AREA_CHUNKS,
   MARKET_VAULT_COUNT_KEY,
   MARKET_VAULT_INDEX_KEY,
+  MARKET_VAULT_INDEX_MAP_KEY,
   MARKET_VAULT_TICKINGAREA,
 } from "./config.js";
 
@@ -54,8 +62,52 @@ export function vaultEntityPosition(index) {
   };
 }
 
-function getVaultEntityIndex(entity) {
-  return entity.getDynamicProperty(MARKET_VAULT_INDEX_KEY) ?? 0;
+// ------------------------------------------------------------
+// 实体索引解析（世界级映射，防索引塌缩）
+// ------------------------------------------------------------
+
+function getVaultIndexMap() {
+  const raw = world.getDynamicProperty(MARKET_VAULT_INDEX_MAP_KEY);
+  if (!raw) return {};
+  try {
+    const m = JSON.parse(raw);
+    return m && typeof m === "object" ? m : {};
+  } catch (e) {
+    return {};
+  }
+}
+function setVaultIndexMap(map) {
+  world.setDynamicProperty(MARKET_VAULT_INDEX_MAP_KEY, JSON.stringify(map));
+}
+
+function entityId(entity) {
+  try {
+    return String(entity.id);
+  } catch (e) {
+    return null;
+  }
+}
+
+/** 实体自身动态属性中的合法索引（仅迁移用） */
+function entityDpIndex(entity) {
+  try {
+    const v = entity.getDynamicProperty(MARKET_VAULT_INDEX_KEY);
+    if (typeof v === "number" && Number.isInteger(v) && v >= 0) return v;
+  } catch (e) {}
+  return undefined;
+}
+
+/**
+ * 解析实体金库索引：世界映射优先，其次实体自身动态属性（仅接受合法非负整数）。
+ * 无法解析时返回 undefined —— 调用方必须跳过/告警，绝不回退到 0。
+ */
+export function getVaultEntityIndex(entity) {
+  const id = entityId(entity);
+  if (id) {
+    const map = getVaultIndexMap();
+    if (id in map && Number.isInteger(map[id]) && map[id] >= 0) return map[id];
+  }
+  return entityDpIndex(entity);
 }
 
 function spawnVaultEntity(index) {
@@ -64,7 +116,15 @@ function spawnVaultEntity(index) {
     MARKET_VAULT_ENTITY_ID,
     vaultEntityPosition(index)
   );
-  entity.setDynamicProperty(MARKET_VAULT_INDEX_KEY, index);
+  try {
+    entity.setDynamicProperty(MARKET_VAULT_INDEX_KEY, index);
+  } catch (e) {}
+  const id = entityId(entity);
+  if (id !== null) {
+    const map = getVaultIndexMap();
+    map[id] = index;
+    setVaultIndexMap(map);
+  }
   return entity;
 }
 
@@ -72,21 +132,45 @@ export function getVaultEntities() {
   try {
     const dim = getVaultDimension();
     const list = dim.getEntities({ type: MARKET_VAULT_ENTITY_ID });
-    list.sort((a, b) => getVaultEntityIndex(a) - getVaultEntityIndex(b));
+    list.sort((a, b) => {
+      const ia = getVaultEntityIndex(a);
+      const ib = getVaultEntityIndex(b);
+      if (ia === undefined) return 1;
+      if (ib === undefined) return -1;
+      return ia - ib;
+    });
     return list;
   } catch (e) {
     return [];
   }
 }
 
+/** 把实体自身动态属性/缺失索引迁移进世界映射，并补建缺失实体 */
 function ensureVaultEntities() {
   const existing = getVaultEntities();
-  const byIndex = new Map();
-  for (const e of existing) byIndex.set(getVaultEntityIndex(e), e);
+  const map = getVaultIndexMap();
+  const used = new Set(Object.values(map).filter((v) => Number.isInteger(v)));
+  let changed = false;
+
+  for (const e of existing) {
+    const id = entityId(e);
+    if (id === null) continue;
+    if (id in map) continue;
+    // 迁移：优先用实体自身合法动态属性，否则分配最小可用索引
+    let idx = entityDpIndex(e);
+    if (idx === undefined || used.has(idx)) {
+      idx = 0;
+      while (used.has(idx)) idx++;
+    }
+    map[id] = idx;
+    used.add(idx);
+    changed = true;
+  }
+  if (changed) setVaultIndexMap(map);
 
   const count = getVaultCount();
   for (let i = 0; i < count; i++) {
-    if (!byIndex.has(i)) {
+    if (!used.has(i)) {
       try {
         spawnVaultEntity(i);
       } catch (e) {
@@ -109,20 +193,34 @@ function getVaultEntityByIndex(index) {
   return getVaultEntities().find((e) => getVaultEntityIndex(e) === index);
 }
 
+/** 金库是否已准备好（实体数量达标才读写，避免把“未加载”当“缺失”而错位） */
+function isVaultReady() {
+  const expected = getVaultCount();
+  if (expected === 0) return true;
+  return getVaultEntities().length >= expected;
+}
+
 /** 查找可用槽位；不足时自动扩展现有金库（新增 1 个实体） */
 function findFreeSlot() {
+  if (!isVaultReady()) return null;
   const entities = ensureVaultEntities();
   for (const e of entities) {
+    const index = getVaultEntityIndex(e);
+    if (index === undefined) continue; // 索引不可解析的实体不得写入（防引用冲突）
     const container = getContainer(e);
     if (!container) continue;
     for (let slot = 0; slot < container.size; slot++) {
       if (!container.getItem(slot)) {
-        return { entity: e, index: getVaultEntityIndex(e), slot };
+        return { entity: e, index, slot };
       }
     }
   }
 
-  const index = getVaultCount();
+  let index = getVaultCount();
+  const used = new Set(
+    Object.values(getVaultIndexMap()).filter((v) => Number.isInteger(v))
+  );
+  while (used.has(index)) index++;
   let entity;
   try {
     entity = spawnVaultEntity(index);
@@ -167,6 +265,22 @@ export function takeItem(index, slot) {
   }
 }
 
+/** 把物品放回指定槽位（交付校验失败回滚用） */
+export function restoreItem(index, slot, stack) {
+  const entity = getVaultEntityByIndex(index);
+  if (!entity) return false;
+  const container = getContainer(entity);
+  if (!container) return false;
+  try {
+    if (container.getItem(slot)) return false; // 槽位被占用不得覆盖
+    container.setItem(slot, stack);
+    return true;
+  } catch (e) {
+    console.error(`[Vault] restoreItem(${index},${slot}) failed: ${e}`);
+    return false;
+  }
+}
+
 /** 只读查看槽位物品；失败返回 undefined */
 export function peekItem(index, slot) {
   const entity = getVaultEntityByIndex(index);
@@ -177,6 +291,43 @@ export function peekItem(index, slot) {
     return container.getItem(slot) ?? undefined;
   } catch (e) {
     return undefined;
+  }
+}
+
+/**
+ * 物品指纹：typeId + 数量 + NBT（名称/lore/附魔/耐久）。
+ * 用于金库物品与市场清单的严格匹配（旧代码只用 typeId+数量，
+ * 会把同类型不同附魔/名称的物品配错 → “货不对板”）。
+ */
+export function getStackFingerprint(stack) {
+  try {
+    const parts = [stack.typeId, stack.amount];
+    try {
+      parts.push(stack.nameTag ?? "");
+    } catch (e) {}
+    try {
+      parts.push(JSON.stringify(stack.getLore()));
+    } catch (e) {}
+    try {
+      const ench = stack.getComponent("enchantable");
+      if (ench) {
+        parts.push(
+          JSON.stringify(
+            ench
+              .getEnchantments()
+              .map((x) => `${x.type.id}:${x.level}`)
+              .sort()
+          )
+        );
+      }
+    } catch (e) {}
+    try {
+      const dur = stack.getComponent("durability");
+      if (dur) parts.push(String(dur.damage));
+    } catch (e) {}
+    return parts.join("|");
+  } catch (e) {
+    return `${stack.typeId}|${stack.amount}`;
   }
 }
 
@@ -243,8 +394,9 @@ function ensureVaultEntitiesAfterLoad(attempt) {
     return;
   }
   const entities = ensureVaultEntities();
+  const mapCount = Object.keys(getVaultIndexMap()).length;
   console.warn(
-    `[Vault] 金库就绪：${entities.length} 个实体，${entities.length * MARKET_VAULT_SLOTS} 个槽位`
+    `[Vault] 金库就绪：${entities.length} 个实体，${entities.length * MARKET_VAULT_SLOTS} 个槽位（索引映射 ${mapCount} 条）`
   );
 }
 

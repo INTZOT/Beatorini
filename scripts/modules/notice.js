@@ -1,6 +1,7 @@
 // ============================================================
 // 悬浮公告管理：表单创建/编辑/删除，TextPrimitive 持久展示
 // 公告存动态属性，世界加载后自动重建
+// 多行公告用单个 TextPrimitive + 真换行，行距交给 lineGapHeight
 // ============================================================
 import { system, world, TextPrimitive } from "@minecraft/server";
 import {
@@ -9,9 +10,14 @@ import {
   ObservableNumber,
   ObservableBoolean,
 } from "@minecraft/server-ui";
-import { LOBBY_DIMENSION_ID, NOTICE_LIST_KEY, NOTICE_MAX } from "./config.js";
+import {
+  LOBBY_DIMENSION_ID,
+  NOTICE_LIST_KEY,
+  NOTICE_MAX,
+  NOTICE_LINE_GAP_DEFAULT,
+} from "./config.js";
+import { applyLineGap } from "../lib/text-primitive.js";
 
-const LINE_SPACING = 0.4; // 多行公告行间距
 const noticeShapes = new Map(); // id -> TextPrimitive[]
 
 const COLOR_PRESETS = [
@@ -55,36 +61,34 @@ function renderNotice(entry) {
   clearShapes(entry.id);
   const lobby = world.getDimension(LOBBY_DIMENSION_ID);
   // 兼容字面 \n（从输入框粘贴的复制版）与真实换行
-  const lines = String(entry.text || "").replace(/\\n/g, "\n").split("\n");
-  const shapes = [];
+  const text = String(entry.text || "").replace(/\\n/g, "\n");
   const color = {
     ...(COLOR_PRESETS[entry.colorIndex]?.rgb || COLOR_PRESETS[0].rgb),
     alpha: 1,
   };
 
-  lines.forEach((line, i) => {
-    try {
-      const shape = new TextPrimitive(
-        { x: entry.x, y: entry.y - i * LINE_SPACING, z: entry.z, dimension: lobby },
-        line
-      );
-      shape.scale = entry.scale ?? 1;
-      shape.color = color;
-      shape.backgroundColorOverride = entry.background
-        ? { red: 0, green: 0, blue: 0, alpha: entry.bgAlpha ?? 0.45 }
-        : { red: 0, green: 0, blue: 0, alpha: 0 };
-      shape.depthTest = false;
-      if (!entry.billboard) {
-        shape.useRotation = true;
-        shape.rotation = { x: 0, y: entry.rotationY ?? 0, z: 0 };
-      }
-      world.primitiveShapesManager.addText(shape, lobby);
-      shapes.push(shape);
-    } catch (e) {
-      console.warn(`[Notice] 公告渲染失败 ${entry.id}: ${e}`);
+  try {
+    // 单 primitive + 真换行：行距由引擎按 lineGapHeight 处理，不再逐行手算坐标
+    const shape = new TextPrimitive(
+      { x: entry.x, y: entry.y, z: entry.z, dimension: lobby },
+      text
+    );
+    shape.scale = entry.scale ?? 1;
+    applyLineGap(shape, entry.lineGap ?? NOTICE_LINE_GAP_DEFAULT);
+    shape.color = color;
+    shape.backgroundColorOverride = entry.background
+      ? { red: 0, green: 0, blue: 0, alpha: entry.bgAlpha ?? 0.45 }
+      : { red: 0, green: 0, blue: 0, alpha: 0 };
+    shape.depthTest = false;
+    if (!entry.billboard) {
+      shape.useRotation = true;
+      shape.rotation = { x: 0, y: entry.rotationY ?? 0, z: 0 };
     }
-  });
-  noticeShapes.set(entry.id, shapes);
+    world.primitiveShapesManager.addText(shape, lobby);
+    noticeShapes.set(entry.id, [shape]);
+  } catch (e) {
+    console.warn(`[Notice] 公告渲染失败 ${entry.id}: ${e}`);
+  }
 }
 
 function renderAllNotices() {
@@ -169,6 +173,10 @@ function showNoticeEditor(player, notice, backFn) {
   const scaleObs = new ObservableNumber(notice?.scale ?? 1, {
     clientWritable: true,
   });
+  const lineGapObs = new ObservableNumber(
+    notice?.lineGap ?? NOTICE_LINE_GAP_DEFAULT,
+    { clientWritable: true }
+  );
   const colorObs = new ObservableNumber(notice?.colorIndex ?? 0, {
     clientWritable: true,
   });
@@ -200,6 +208,13 @@ function showNoticeEditor(player, notice, backFn) {
     .slider("缩放", scaleObs, new ObservableNumber(0.5), new ObservableNumber(5), {
       step: 0.1,
     })
+    .slider(
+      "行距（多行时生效）",
+      lineGapObs,
+      new ObservableNumber(0),
+      new ObservableNumber(1),
+      { step: 0.05 }
+    )
     .spacer()
     .dropdown(
       "颜色",
@@ -259,6 +274,7 @@ function showNoticeEditor(player, notice, backFn) {
         y,
         z,
         scale: scaleObs.getData(),
+        lineGap: Math.round(lineGapObs.getData() * 100) / 100,
         colorIndex: colorObs.getData(),
         background: bgObs.getData(),
         bgAlpha: bgAlphaObs.getData() / 100,

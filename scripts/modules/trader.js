@@ -4,8 +4,14 @@ import {
   DIMENSION_COUNT,
   LOBBY_DIMENSION_ID,
   LAST_TRADER_DAY_PREFIX,
+  CLOCK_MARKER_TRADER_NOON,
 } from "./config.js";
 import { getPlayerBoundIndex } from "./island.js";
+import { onMarker, isClockReady } from "./clock.js";
+
+const FALLBACK_INTERVAL_TICKS = 100; // 世界时钟不可用时的轮询间隔（原实现）
+const TRADER_LIFETIME_TICKS = 20 * 60 * 10; // 商人停留 10 分钟后自动移除
+let fallbackHandle; // 兜底轮询句柄（system.runInterval 返回）
 
 /** 在玩家附近寻找安全生成点：不生成在虚空，需要脚下实心方块 + 2 格垂直空间 */
 function findSafeSpawnNear(player) {
@@ -71,6 +77,85 @@ function cleanMainWorldTraders() {
   return cleaned;
 }
 
+/** 为单个玩家尝试生成流浪商人（marker 与兜底轮询共用同一套判断），成功返回 true */
+function trySpawnTrader(player) {
+  const boundIndex = getPlayerBoundIndex(player.id);
+  if (boundIndex === undefined) return false;
+  if (player.dimension.id !== `${DIMENSION_NAMESPACE}:void_${boundIndex}`)
+    return false;
+
+  // 同一玩家 2 游戏日内只来一次（marker 重复触发 / 重启后的保护）
+  const currentDay = Math.floor(world.getAbsoluteTime() / 24000);
+  const playerKey = LAST_TRADER_DAY_PREFIX + player.id;
+  const lastTraderDay = world.getDynamicProperty(playerKey) ?? -999;
+  if (currentDay - lastTraderDay < 2) return false;
+
+  // 在玩家附近随机选安全点生成，避免干扰挂机
+  const safePos = findSafeSpawnNear(player);
+  if (!safePos) {
+    console.warn(
+      `[Trader] 未找到安全生成点，跳过 ${player.name} 的流浪商人生成`
+    );
+    return false;
+  }
+
+  try {
+    const trader = player.dimension.spawnEntity(
+      "minecraft:wandering_trader",
+      safePos
+    );
+    player.sendMessage("§e一位流浪商人来到了你的岛屿！");
+    system.runTimeout(() => {
+      try {
+        trader.remove();
+      } catch (e) {}
+    }, TRADER_LIFETIME_TICKS);
+  } catch (e) {
+    // 生成失败就不写日期，留到下一个正午窗口重试
+    console.warn(`[Trader] 生成失败（${player.name}）：${e}`);
+    return false;
+  }
+
+  world.setDynamicProperty(playerKey, currentDay);
+  return true;
+}
+
+/** 一次触发：给所有在线且待在自己岛上的玩家派商人 */
+function triggerTraderWave(source) {
+  const players = world.getPlayers();
+  let spawned = 0;
+  for (const player of players) {
+    try {
+      if (trySpawnTrader(player)) spawned++;
+    } catch (e) {
+      console.warn(`[Trader] 处理 ${player.name} 时异常：${e}`);
+    }
+  }
+  if (spawned > 0) {
+    console.warn(
+      `[Trader] 商人波次（${source}）：${spawned}/${players.length} 人生成`
+    );
+  }
+}
+
+/** 兜底：世界时钟不可用时沿用旧的 100 tick 轮询 + 正午窗口判断 */
+function pollTraderNoon() {
+  if (isClockReady()) {
+    // 时钟后来可用了，停掉兜底轮询
+    if (fallbackHandle !== undefined) {
+      try {
+        system.clearRun(fallbackHandle);
+      } catch (e) {}
+      fallbackHandle = undefined;
+    }
+    console.warn("[Trader] 世界时钟已可用，停止兜底轮询");
+    return;
+  }
+  const timeOfDay = world.getTimeOfDay();
+  if (timeOfDay < 5500 || timeOfDay >= 6500) return;
+  triggerTraderWave("fallback-poll");
+}
+
 export function init() {
   // 启动时清理服务器重启遗留的流浪商人（岛屿维度 + 主世界大厅）
   system.runTimeout(() => {
@@ -95,45 +180,23 @@ export function init() {
     }
   }, 40);
 
-  // --- 每2个游戏日正午在玩家空岛生成流浪商人 ---
-  system.runInterval(() => {
-    const timeOfDay = world.getTimeOfDay();
-    if (timeOfDay < 5500 || timeOfDay >= 6500) return;
+  // --- 主路径：世界时钟「每 2 游戏日正午」的 time marker ---
+  onMarker(CLOCK_MARKER_TRADER_NOON, () => triggerTraderWave("marker"));
 
-    const currentDay = Math.floor(world.getAbsoluteTime() / 24000);
-
-    for (const player of world.getPlayers()) {
-      const boundIndex = getPlayerBoundIndex(player.id);
-      if (boundIndex === undefined) continue;
-      if (
-        player.dimension.id !== `${DIMENSION_NAMESPACE}:void_${boundIndex}`
-      )
-        continue;
-
-      const playerKey = LAST_TRADER_DAY_PREFIX + player.id;
-      const lastTraderDay = world.getDynamicProperty(playerKey) ?? -999;
-      if (currentDay - lastTraderDay < 2) continue;
-
-      // 在玩家附近随机选安全点生成，避免干扰挂机
-      const safePos = findSafeSpawnNear(player);
-      if (!safePos) {
-        console.warn(
-          `[Trader] 未找到安全生成点，跳过 ${player.name} 的流浪商人生成`
-        );
-        continue;
-      }
-
-      world.setDynamicProperty(playerKey, currentDay);
-      const trader = player.dimension.spawnEntity(
-        "minecraft:wandering_trader",
-        safePos
-      );
-      player.sendMessage("§e一位流浪商人来到了你的岛屿！");
-      system.runTimeout(() => {
+  // --- 兜底：世界加载后若时钟不可用，退回 100 tick 轮询 ---
+  world.afterEvents.worldLoad.subscribe(() => {
+    system.runTimeout(() => {
+      if (isClockReady()) return;
+      if (fallbackHandle !== undefined) {
         try {
-          trader.remove();
+          system.clearRun(fallbackHandle);
         } catch (e) {}
-      }, 20 * 60 * 10);
-    }
-  }, 100);
+      }
+      fallbackHandle = system.runInterval(
+        pollTraderNoon,
+        FALLBACK_INTERVAL_TICKS
+      );
+      console.warn("[Trader] 世界时钟不可用，已启用 100 tick 轮询兜底");
+    }, 60);
+  });
 }

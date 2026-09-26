@@ -5,6 +5,13 @@
 # 外部参考脚本（不参与打包/提交）
 scripts/灵魂出窍参考/
 
+# Script API 依赖（npm install 生成，仅本地开发/编辑器提示用，不打包不提交）
+node_modules/
+.npm-cache/
+
+# 本地 BDS/Endstone 测试实例（BDS 二进制 + 世界 + 测试包，体积大，与源码无关）
+.bds-test/
+
 # 系统与编辑器临时文件
 Thumbs.db
 Desktop.ini

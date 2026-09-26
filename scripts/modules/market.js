@@ -2,12 +2,35 @@ import { system, world, ItemTypes, BlockTypes } from "@minecraft/server";
 import { CustomForm, ObservableString, ObservableNumber } from "@minecraft/server-ui";
 import { countItem, removeItems, giveItemToPlayer } from "../lib/inventory.js";
 import { getPlayerMoney } from "./money.js";
-import { storeItem, takeItem, getVaultEntities, getVaultCount } from "./vault.js";
-import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_VAULT_INDEX_KEY, MARKET_QUARANTINE_KEY } from "./config.js";
+import {
+  storeItem,
+  takeItem,
+  restoreItem,
+  getStackFingerprint,
+  getVaultEntityIndex,
+  getVaultEntities,
+  getVaultCount,
+} from "./vault.js";
+import { MARKET_LISTINGS_KEY, MARKET_SOLD_PREFIX, MARKET_RETURNS_PREFIX, MARKET_UNLOCKED_PREFIX, MARKET_COUNTER_KEY, MARKET_UNLOCK_COST, MARKET_TAX_RATE, MARKET_QUARANTINE_KEY } from "./config.js";
 
 // --- 市场超时自动下架 ---
 const AUTO_DELIST_MS = 48 * 60 * 60 * 1000; // 上架超过48小时未售出
 const MARKET_AUTO_DELIST_INTERVAL_TICKS = 20 * 60 * 10; // 每10分钟检查一次
+
+/**
+ * 校验金库物品与清单一致（typeId + 数量 + NBT 指纹）。
+ * 清单不含 nbtFp（旧数据）时退化为 typeId+数量校验。
+ * 防止“货不对板”：金库引用错位/被配错时拒绝交付并回滚。
+ */
+function stackMatchesListing(stack, listing) {
+  if (!stack) return false;
+  if (stack.typeId !== listing.typeId) return false;
+  if (stack.amount !== listing.amount) return false;
+  if (listing.nbtFp) {
+    return getStackFingerprint(stack) === listing.nbtFp;
+  }
+  return true;
+}
 
 // ============================================================
 // 市场数据操作
@@ -216,13 +239,14 @@ function confirmMarketPurchase(player, listing, backFn) {
         return;
       }
 
-      // 交付：完整 ItemStack 直接入买家背包，背包满则剩余掉落在脚下
-      let leftover;
-      try {
-        leftover = buyer
-          .getComponent("inventory")
-          .container.addItem(stack);
-      } catch (e) {
+      // 交付前校验：金库物品必须与清单一致（防“货不对板”，如引用错位配到相邻清单物品）
+      if (!stackMatchesListing(stack, confirmed)) {
+        // 物品放回原槽位；清单保留（引用暂错），启动对账会按指纹重新匹配救回
+        const putBack = restoreItem(
+          confirmed.vault?.index,
+          confirmed.vault?.slot,
+          stack
+        );
         const rollbackListings = getMarketListings();
         rollbackListings.push(confirmed);
         setMarketListings(rollbackListings);
@@ -231,10 +255,36 @@ function confirmMarketPurchase(player, listing, backFn) {
             `scoreboard players add @s money ${confirmed.price}`
           );
         } catch (e) {}
+        buyer.sendMessage("§c交易校验失败（物品与清单不符），已退款！请稍后再试");
+        console.error(
+          `[Market] Mismatch on buy ${confirmed.id}: expect ${confirmed.typeId} x${confirmed.amount}, got ${stack.typeId} x${stack.amount}, putBack=${putBack}`
+        );
+        return;
+      }
+
+      // 交付：完整 ItemStack 直接入买家背包，背包满则剩余掉落在脚下
+      let leftover;
+      try {
+        leftover = buyer
+          .getComponent("inventory")
+          .container.addItem(stack);
+      } catch (e) {
+        // 回滚：先把物品放回金库（新槽位），再把清单写回——引用必须同步更新，
+        // 否则清单指向已清空的旧槽位，下次交付/对账会再次错位
         const restored = storeItem(confirmed.id, stack);
-        if (!restored) {
+        if (restored) {
+          confirmed.vault = restored;
+        } else {
           buyer.dimension.spawnItem(stack, buyer.location);
         }
+        const rollbackListings = getMarketListings();
+        rollbackListings.push(confirmed);
+        setMarketListings(rollbackListings);
+        try {
+          buyer.runCommand(
+            `scoreboard players add @s money ${confirmed.price}`
+          );
+        } catch (e) {}
         buyer.sendMessage("§c交易失败，已退款！请重试");
         console.error(`[Market] Delivery failed: ${e}`);
         return;
@@ -419,6 +469,7 @@ function showMarketCreateListing(player, backFn) {
         price,
         vault: vaultRef,
         itemKey: itemKey || undefined,
+        nbtFp: getStackFingerprint(listingStack),
         listedAt: Date.now(),
       };
       const listings = getMarketListings();
@@ -474,6 +525,24 @@ function showMarketMyListings(player, backFn) {
         const stack = takeItem(l.vault?.index, l.vault?.slot);
         if (!stack) {
           player.sendMessage("§c商品数据异常（金库未找到物品），请联系管理员");
+          player.playSound("random.break");
+          return;
+        }
+        if (!stackMatchesListing(stack, l)) {
+          // 引用配错：放回原槽位，清单下架并隔离待管理员处理（避免错发他人物品）
+          const putBack = restoreItem(l.vault?.index, l.vault?.slot, stack);
+          current.splice(idx, 1);
+          setMarketListings(current);
+          const quarantine = getMarketQuarantine();
+          quarantine.push({
+            ...l,
+            removedAt: Date.now(),
+            reason: "delist_mismatch",
+            mismatch: `${stack.typeId} x${stack.amount} (${getStackFingerprint(stack)})`,
+            putBack,
+          });
+          setMarketQuarantine(quarantine);
+          player.sendMessage("§c商品数据异常（与清单不符），已下架隔离，请联系管理员");
           player.playSound("random.break");
           return;
         }
@@ -563,6 +632,23 @@ function onPlayerJoin(player) {
         // 金库无损返还：直接从金库取出完整 ItemStack 交给玩家
         const stack = takeItem(r.vault.index, r.vault.slot);
         if (stack) {
+          if (!stackMatchesListing(stack, r)) {
+            // 引用配错：放回原槽位并隔离，不发给卖家
+            const putBack = restoreItem(r.vault.index, r.vault.slot, stack);
+            const quarantine = getMarketQuarantine();
+            quarantine.push({
+              ...r,
+              removedAt: Date.now(),
+              reason: "return_mismatch",
+              mismatch: `${stack.typeId} x${stack.amount} (${getStackFingerprint(stack)})`,
+              putBack,
+            });
+            setMarketQuarantine(quarantine);
+            console.error(
+              `[Market] Return mismatch for ${player.name}: expect ${r.typeId} x${r.amount}, got ${stack.typeId} x${stack.amount}`
+            );
+            continue;
+          }
           const leftover = player
             .getComponent("inventory")
             .container.addItem(stack);
@@ -641,6 +727,24 @@ function autoDelistExpiredListings() {
         (p) => p.id === l.sellerId
       );
 
+      if (stack && !stackMatchesListing(stack, l)) {
+        // 引用配错：放回原槽位并隔离，等待对账/管理员处理
+        const putBack = restoreItem(l.vault?.index, l.vault?.slot, stack);
+        const quarantine = getMarketQuarantine();
+        quarantine.push({
+          ...l,
+          removedAt: now,
+          reason: "auto_delist_mismatch",
+          mismatch: `${stack.typeId} x${stack.amount} (${getStackFingerprint(stack)})`,
+          putBack,
+        });
+        setMarketQuarantine(quarantine);
+        console.error(
+          `[Market] Auto-delist mismatch ${l.id}: expect ${l.typeId} x${l.amount}, got ${stack.typeId} x${stack.amount}, putBack=${putBack}`
+        );
+        continue;
+      }
+
       if (seller && stack) {
         const leftover = seller
           .getComponent("inventory")
@@ -667,6 +771,7 @@ function autoDelistExpiredListings() {
         typeId: l.typeId,
         amount: l.amount,
         itemKey: l.itemKey,
+        nbtFp: l.nbtFp,
         vault: l.vault,
         returnedAt: now,
       });
@@ -713,42 +818,52 @@ function reconcileMarketVault() {
   try {
     const listings = getMarketListings();
     const entities = getVaultEntities();
-    const occupied = new Map(); // "index:slot" -> container
+    const occupied = new Map(); // "index:slot" -> { container, item }
     for (const e of entities) {
-      const index = e.getDynamicProperty(MARKET_VAULT_INDEX_KEY) ?? 0;
+      const index = getVaultEntityIndex(e);
+      if (index === undefined) {
+        // 索引不可解析：跳过（绝不回退成 0，避免多个实体相互覆盖引用）
+        console.error(
+          `[Market] 对账：发现索引不可解析的金库实体（跳过其内容）`
+        );
+        continue;
+      }
       const container = e.getComponent("minecraft:inventory")?.container;
       if (!container) continue;
       for (let slot = 0; slot < container.size; slot++) {
-        if (container.getItem(slot)) {
-          occupied.set(`${index}:${slot}`, container);
+        const item = container.getItem(slot);
+        if (item) {
+          occupied.set(`${index}:${slot}`, { container, item });
         }
       }
     }
 
-    const claimed = new Set();
+    // 第一遍：引用有效且内容与清单一致 → 认领；否则进入待修复
+    const claimed = new Map(); // key -> listingId（同一槽位只允许一个清单认领）
     const broken = [];
     for (const l of listings) {
       const key = `${l.vault?.index}:${l.vault?.slot}`;
-      if (occupied.has(key)) {
-        claimed.add(key);
+      const occ = occupied.get(key);
+      if (occ && !claimed.has(key) && stackMatchesListing(occ.item, l)) {
+        claimed.set(key, l.id);
       } else {
         broken.push(l);
       }
     }
 
-    // 孤儿物品按 typeId+amount 匹配损坏清单，尽量救回
+    // 第二遍：孤儿/错位物品按【指纹】匹配待修复清单，尽量救回（含同类型不同 NBT 的物品）
+    const healed = [];
     for (const l of broken) {
-      if (claimed.has(`${l.vault?.index}:${l.vault?.slot}`)) continue;
       const matchKey = [...occupied.keys()].find((key) => {
         if (claimed.has(key)) return false;
-        const [index, slot] = key.split(":").map(Number);
-        const item = occupied.get(key)?.getItem(slot);
-        return item?.typeId === l.typeId && item.amount === l.amount;
+        const occ = occupied.get(key);
+        return occ && stackMatchesListing(occ.item, l);
       });
       if (matchKey) {
         const [index, slot] = matchKey.split(":").map(Number);
         l.vault = { index, slot };
-        claimed.add(matchKey);
+        claimed.set(matchKey, l.id);
+        healed.push(l);
       }
     }
 
@@ -756,7 +871,12 @@ function reconcileMarketVault() {
     const removed = [];
     for (const l of listings) {
       const key = `${l.vault?.index}:${l.vault?.slot}`;
-      if (occupied.has(key)) {
+      const occ = occupied.get(key);
+      if (
+        occ &&
+        claimed.get(key) === l.id &&
+        stackMatchesListing(occ.item, l)
+      ) {
         kept.push(l);
       } else {
         removed.push(l);
@@ -769,7 +889,7 @@ function reconcileMarketVault() {
               rawtext: [
                 { text: "§c市场：你的商品「" },
                 getListingDisplayName(l),
-                { text: "」在金库中未找到，已自动下架并隔离，请联系管理员" },
+                { text: "」在金库中未找到匹配物品，已自动下架并隔离，请联系管理员" },
               ],
             }
           );
@@ -793,9 +913,9 @@ function reconcileMarketVault() {
     const orphanCount = [...occupied.keys()].filter(
       (key) => !claimed.has(key)
     ).length;
-    if (removed.length > 0 || orphanCount > 0) {
+    if (healed.length > 0 || removed.length > 0 || orphanCount > 0) {
       console.warn(
-        `[Market] 对账完成：移除 ${removed.length} 个异常清单（已隔离），${orphanCount} 个孤儿物品保留在金库`
+        `[Market] 对账完成：修复 ${healed.length} 个错位清单，移除 ${removed.length} 个异常清单（已隔离），${orphanCount} 个孤儿物品保留在金库`
       );
     }
   } catch (e) {

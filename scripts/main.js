@@ -3,6 +3,7 @@
 // ============================================================
 
 // --- 核心模块初始化函数 ---
+import { init as initClock } from "./modules/clock.js";
 import { init as initDimensions } from "./modules/dimensions.js";
 import { init as initVault } from "./modules/vault.js";
 import { init as initIsland } from "./modules/island.js";
@@ -32,6 +33,8 @@ import { init as initMenus, registerCustomCommands } from "./modules/menus.js";
 // 启动所有模块
 // ============================================================
 
+// 自定义世界时钟必须在 startup 之前注册，放在最前面
+initClock();
 initDimensions();
 initVault();
 initIsland();

@@ -9,7 +9,7 @@ if (-not (Test-Path -LiteralPath $dst)) {
     throw "Target directory missing: $dst"
 }
 
-robocopy $src $dst /E /R:1 /W:1 /XD "$src\.git" "$src\.agents" /XF "sync-to-game.ps1" /NFL /NDL /NJH /NJS /NP
+robocopy $src $dst /E /R:1 /W:1 /XD "$src\.git" "$src\.agents" "$src\node_modules" /XF "sync-to-game.ps1" "HANDOVER.md" /NFL /NDL /NJH /NJS /NP
 $code = $LASTEXITCODE
 if ($code -ge 8) {
     throw "Sync failed (robocopy exit code $code)"

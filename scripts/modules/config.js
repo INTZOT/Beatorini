@@ -24,7 +24,16 @@ export const ISLAND_VISIT_REQ_PREFIX = "island:visit_req_";
 export const ISLAND_NOTIFICATIONS_PREFIX = "island:notifications_";
 export const MAX_ISLAND_MEMBERS = 5;
 export const ISLAND_BOUNDARY_PREFIX = "island:boundary_"; // 岛屿动态边界（六极值 JSON）
-export const ISLAND_BOUNDARY_LIMIT = 256; // 单方向自动扩展上限（超出不扩展，重置不覆盖）
+export const ISLAND_BOUNDARY_LIMIT = 256; // 水平方向（x/z）自动扩展上限（超出不扩展，重置不覆盖）
+export const ISLAND_BOUNDARY_LIMIT_Y = 512; // 垂直方向（y）自动扩展上限，与维度上限一致
+
+// --- 空岛维度高度（由 tools/gen-island-dimensions.js 生成 dimensions/island_void_N.json） ---
+// 实测（BDS 1.26.51）：文档写 height_range ≤ 384，但真实约束是 min_y + height_range ≤ 512，
+// 即维度最高点不能超过 512；超过会被整份 JSON 拒绝（维度静默回落默认值）。
+export const ISLAND_DIMENSION_MIN_Y = -64; // 维度底部
+export const ISLAND_DIMENSION_HEIGHT_RANGE = 576; // 总高（-64 + 576 = 最高点 512）
+export const ISLAND_DIMENSION_MAX_Y = 512; // 建筑上限；改动时三个值必须自洽
+
 export const ISLAND_BOUNDARY_INITIAL = {
   xMin: -8,
   xMax: 8,
@@ -59,10 +68,12 @@ export const PLAYER_NAME_PREFIX = "player:name_"; // 玩家 ID → 名字映射�
 // --- 大厅悬浮排行榜 ---
 export const LEADERBOARD_DISPLAY_PREFIX = "leaderboard:display_"; // 各分类位置 JSON：{x,y,z,scale}
 export const LEADERBOARD_DISPLAY_COUNT = 20; // 悬浮榜显示条数
+export const LEADERBOARD_LINE_GAP_DEFAULT = 0.15; // 悬浮榜默认行距（TextPrimitive.lineGapHeight）
 
 // --- 悬浮公告 ---
 export const NOTICE_LIST_KEY = "notice:list"; // 公告列表 JSON
 export const NOTICE_MAX = 32; // 公告数量上限
+export const NOTICE_LINE_GAP_DEFAULT = 0.15; // 公告默认行距（TextPrimitive.lineGapHeight）
 
 // --- 天赋 ---
 export const TALENT_PREFIX = "talent:lv_";
@@ -73,6 +84,19 @@ export const TALENT_COST_GROWTH = 1.04;
 
 // --- 流浪商人 ---
 export const LAST_TRADER_DAY_PREFIX = "island:last_trader_day:";
+
+// --- 自定义世界时钟（@minecraft/server 2.11.0-beta 新增能力，见 clock.js） ---
+export const SERVER_CLOCK_ID = "beatorini:server";
+export const CLOCK_MARKER_TRADER_NOON = "beatorini:trader_noon"; // 每 2 游戏日正午
+export const TRADER_NOON_TIME = 6000; // 正午（tick）；启动时时钟会对齐到游戏时刻，period 取 24000 整数倍即可保证每次落在正午
+export const TRADER_PERIOD_TICKS = 48000; // 2 游戏日 = 48000 tick
+export const CLOCK_MARKERS = [
+  {
+    name: CLOCK_MARKER_TRADER_NOON,
+    time: TRADER_NOON_TIME,
+    period: TRADER_PERIOD_TICKS,
+  },
+];
 
 // --- 市场 ---
 export const MARKET_LISTINGS_KEY = "market:listings";
@@ -109,4 +133,5 @@ export const MARKET_VAULT_GRID_Z = 4;
 export const MARKET_VAULT_AREA_CHUNKS = 2;
 export const MARKET_VAULT_COUNT_KEY = "market:vault_count";
 export const MARKET_VAULT_INDEX_KEY = "market:vault_index";
+export const MARKET_VAULT_INDEX_MAP_KEY = "market:vault_index_map"; // 实体 uniqueId → 索引（世界级映射；实体自身动态属性可能丢失/损坏，不可依赖）
 export const MARKET_VAULT_TICKINGAREA = "beatorini_market_vault";

@@ -10,7 +10,9 @@ import {
   LOBBY_DIMENSION_ID,
   LEADERBOARD_DISPLAY_PREFIX,
   LEADERBOARD_DISPLAY_COUNT,
+  LEADERBOARD_LINE_GAP_DEFAULT,
 } from "./config.js";
+import { applyLineGap } from "../lib/text-primitive.js";
 
 /** 收集某分类的排行数据（在线玩家 + 离线动态属性，含名字映射） */
 function collectCategoryEntries(category) {
@@ -133,6 +135,7 @@ function getBoardConfig(categoryKey) {
       bgAlpha: cfg.bgAlpha ?? 0.45,
       billboard: cfg.billboard ?? true,
       rotationY: cfg.rotationY ?? 0,
+      lineGap: cfg.lineGap ?? LEADERBOARD_LINE_GAP_DEFAULT,
     };
   } catch (e) {
     return null;
@@ -196,6 +199,7 @@ function renderBoard(categoryKey) {
       buildBoardText(category, entries, cfg.colorIndex)
     );
     shape.scale = cfg.scale;
+    applyLineGap(shape, cfg.lineGap);
     shape.color = { red: 1, green: 1, blue: 1, alpha: 1 };
     shape.backgroundColorOverride = cfg.background
       ? { red: 0, green: 0, blue: 0, alpha: cfg.bgAlpha }
@@ -304,6 +308,10 @@ function showLeaderboardEditor(player, category, backFn) {
   const scaleObs = new ObservableNumber(cfg?.scale ?? 1, {
     clientWritable: true,
   });
+  const lineGapObs = new ObservableNumber(
+    cfg?.lineGap ?? LEADERBOARD_LINE_GAP_DEFAULT,
+    { clientWritable: true }
+  );
   const colorObs = new ObservableNumber(cfg?.colorIndex ?? 0, {
     clientWritable: true,
   });
@@ -339,6 +347,13 @@ function showLeaderboardEditor(player, category, backFn) {
       new ObservableNumber(0.5),
       new ObservableNumber(5),
       { step: 0.1 }
+    )
+    .slider(
+      "行距",
+      lineGapObs,
+      new ObservableNumber(0),
+      new ObservableNumber(1),
+      { step: 0.05 }
     )
     .spacer()
     .dropdown(
@@ -381,6 +396,7 @@ function showLeaderboardEditor(player, category, backFn) {
         y,
         z,
         scale: scaleObs.getData(),
+        lineGap: Math.round(lineGapObs.getData() * 100) / 100,
         colorIndex: colorObs.getData(),
         background: bgObs.getData(),
         bgAlpha: bgAlphaObs.getData() / 100,

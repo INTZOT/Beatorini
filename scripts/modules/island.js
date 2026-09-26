@@ -24,7 +24,10 @@ import {
   ISLAND_NOTIFICATIONS_PREFIX,
   ISLAND_BOUNDARY_PREFIX,
   ISLAND_BOUNDARY_LIMIT,
+  ISLAND_BOUNDARY_LIMIT_Y,
   ISLAND_BOUNDARY_INITIAL,
+  ISLAND_DIMENSION_MIN_Y,
+  ISLAND_DIMENSION_MAX_Y,
   ISLAND_RESET_DELAY_MS,
   ISLAND_RESET_SCHEDULE_PREFIX,
   ISLAND_ABANDON_PREFIX,
@@ -1106,7 +1109,7 @@ export function init() {
     // 超出上限的放置不扩展边界（静默处理，不打扰玩家），避免重置范围爆炸
     if (
       Math.max(Math.abs(x), Math.abs(z)) > limit ||
-      Math.abs(y) > limit
+      Math.abs(y) > ISLAND_BOUNDARY_LIMIT_Y
     ) {
       return;
     }
@@ -1192,8 +1195,8 @@ async function performIslandReset(index) {
   const x2 = Math.min(limit, boundary.xMax);
   const z1 = Math.max(-limit, boundary.zMin);
   const z2 = Math.min(limit, boundary.zMax);
-  const y1 = Math.max(-64, boundary.yMin);
-  const y2 = Math.min(319, boundary.yMax);
+  const y1 = Math.max(ISLAND_DIMENSION_MIN_Y, boundary.yMin);
+  const y2 = Math.min(ISLAND_DIMENSION_MAX_Y, boundary.yMax);
   if (x1 > x2 || z1 > z2 || y1 > y2) {
     setIslandStatus(index, "dirty");
     world.setDynamicProperty(ISLAND_RESET_SCHEDULE_PREFIX + index, undefined);
