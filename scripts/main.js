@@ -3,6 +3,7 @@
 // ============================================================
 
 // --- 核心模块初始化函数 ---
+import { ENABLE_WORLD_CLOCK } from "./modules/config.js";
 import { init as initClock } from "./modules/clock.js";
 import { init as initDimensions } from "./modules/dimensions.js";
 import { init as initVault } from "./modules/vault.js";
@@ -33,8 +34,12 @@ import { init as initMenus, registerCustomCommands } from "./modules/menus.js";
 // 启动所有模块
 // ============================================================
 
-// 自定义世界时钟必须在 startup 之前注册，放在最前面
-initClock();
+// 世界时钟必须在 startup 之前注册；排查时置 ENABLE_WORLD_CLOCK = false 可整体跳过
+if (ENABLE_WORLD_CLOCK) {
+  initClock();
+} else {
+  console.warn("[Beatorini] ENABLE_WORLD_CLOCK = false，已跳过世界时钟注册");
+}
 initDimensions();
 initVault();
 initIsland();

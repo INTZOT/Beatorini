@@ -341,6 +341,30 @@ export function init() {
   });
 }
 
+/**
+ * 给 Promise 加 tick 级超时。
+ * 线上曾出现金库初始化「零日志」卡死：`createTickingArea` 的 await 长时间不 resolve，
+ * setupVault 既不往下走也不抛错 → ensureVaultEntities 永不执行 → 市场永远拿不到金库实体。
+ * 加超时后这种情况会以明确错误暴露（并走 setupVault 的重试 / Init failed 日志），不再静默。
+ */
+async function withTimeout(promise, ticks, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = system.runTimeout(() => {
+      reject(new Error(`${label} 超过 ${ticks} tick 未完成`));
+    }, ticks);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer !== undefined) {
+      try {
+        system.clearRun(timer);
+      } catch (e) {}
+    }
+  }
+}
+
 async function setupVault(retry = 0) {
   try {
     const dim = getVaultDimension();
@@ -365,7 +389,11 @@ async function setupVault(retry = 0) {
         );
         return;
       }
-      await manager.createTickingArea(MARKET_VAULT_TICKINGAREA, options);
+      await withTimeout(
+        manager.createTickingArea(MARKET_VAULT_TICKINGAREA, options),
+        100,
+        `createTickingArea(${MARKET_VAULT_TICKINGAREA})`
+      );
       console.warn(
         `[Vault] Ticking area 就绪（${manager.chunkCount}/${manager.maxChunkCount} chunks）`
       );
@@ -387,17 +415,30 @@ async function setupVault(retry = 0) {
 
 /** 等待金库实体加载完成后再执行 ensureVaultEntities */
 function ensureVaultEntitiesAfterLoad(attempt) {
-  const expected = getVaultCount();
-  const found = getVaultEntities().length;
-  if (expected > 0 && found < expected && attempt < 20) {
-    system.runTimeout(() => ensureVaultEntitiesAfterLoad(attempt + 1), 10);
-    return;
+  // 注意：这里是 runTimeout 递归链，抛出的异常不会被 setupVault 的 catch 捕获，
+  // 之前一旦抛错整条链会静默中断（连一条日志都没有）。所以这里自己兜住并记录。
+  try {
+    const expected = getVaultCount();
+    const found = getVaultEntities().length;
+    if (expected > 0 && found < expected && attempt < 20) {
+      system.runTimeout(() => ensureVaultEntitiesAfterLoad(attempt + 1), 10);
+      return;
+    }
+    const entities = ensureVaultEntities();
+    const mapCount = Object.keys(getVaultIndexMap()).length;
+    console.warn(
+      `[Vault] 金库就绪：${entities.length} 个实体，${entities.length * MARKET_VAULT_SLOTS} 个槽位（索引映射 ${mapCount} 条）`
+    );
+  } catch (e) {
+    console.error(
+      `[Vault] 实体检查失败（attempt=${attempt}/${20}）：${e}`
+    );
+    if (attempt < 20) {
+      system.runTimeout(() => ensureVaultEntitiesAfterLoad(attempt + 1), 20);
+    } else {
+      console.error("[Vault] 实体检查连续失败，金库可能不可用");
+    }
   }
-  const entities = ensureVaultEntities();
-  const mapCount = Object.keys(getVaultIndexMap()).length;
-  console.warn(
-    `[Vault] 金库就绪：${entities.length} 个实体，${entities.length * MARKET_VAULT_SLOTS} 个槽位（索引映射 ${mapCount} 条）`
-  );
 }
 
 // ============================================================

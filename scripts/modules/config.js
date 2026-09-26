@@ -86,6 +86,8 @@ export const TALENT_COST_GROWTH = 1.04;
 export const LAST_TRADER_DAY_PREFIX = "island:last_trader_day:";
 
 // --- 自定义世界时钟（@minecraft/server 2.11.0-beta 新增能力，见 clock.js） ---
+// 排查开关：置 false 可完全跳过 clock.js 初始化（线上二分定位用，改完需重启）
+export const ENABLE_WORLD_CLOCK = true;
 export const SERVER_CLOCK_ID = "beatorini:server";
 export const CLOCK_MARKER_TRADER_NOON = "beatorini:trader_noon"; // 每 2 游戏日正午
 export const TRADER_NOON_TIME = 6000; // 正午（tick）；启动时时钟会对齐到游戏时刻，period 取 24000 整数倍即可保证每次落在正午
