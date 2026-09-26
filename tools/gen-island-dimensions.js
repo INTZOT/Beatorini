@@ -72,7 +72,32 @@ for (let i = 1; i <= COUNT; i++) {
   written++;
 }
 
+// --- 金库维度：同样需要包定义 ---------------------------------------------
+// island:vault 与 256 个 void 维度走的是同一条裸注册路径（dimensions.js 里只调
+// registerCustomDimension(id)，没有高度也没有生成器）。区别在于 void 维度有下面这些
+// JSON 覆盖，而 vault 此前没有 —— 线上 2026-09-26 实测后果：
+//     execute in island:vault run setblock 0 100 0 air
+//       -> Cannot place block outside of the world
+// 该维度区块永远无法进入 loaded/ticking，spawnEntity 抛 LocationInUnloadedChunkError，
+// 金库实体建不出来、区块从不落盘（所有世界备份中都没有它们），市场永久 0/2 不可用。
+// 给它补一份同名定义，机制与 void 维度完全一致。
+const VAULT_DIM_ID = readStr("MARKET_VAULT_DIM_ID");
+fs.writeFileSync(
+  path.join(OUT_DIR, "island_vault.json"),
+  JSON.stringify({
+    format_version: FORMAT_VERSION,
+    "minecraft:dimension": {
+      description: { identifier: VAULT_DIM_ID },
+      components: {
+        "minecraft:generation": { generator_type: "void" },
+        "minecraft:dimension_height": { min_y: MIN_Y, height_range: HEIGHT_RANGE },
+      },
+    },
+  }) + "\n"
+);
+written++;
+
 console.log(
   `已生成 ${written} 个维度定义 → ${path.relative(ROOT, OUT_DIR)}/` +
-    `（${NAMESPACE}:void_1 ~ void_${COUNT}，高度 ${MIN_Y}..${MAX_Y}）`
+    `（${NAMESPACE}:void_1 ~ void_${COUNT} + ${VAULT_DIM_ID}，高度 ${MIN_Y}..${MAX_Y}）`
 );
