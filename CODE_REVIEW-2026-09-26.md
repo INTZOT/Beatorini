@@ -267,3 +267,28 @@ return leftover?.amount ?? 0;      // ← leftover 从未 spawnItem
 [Market] 对账完成：修复 0 个错位清单，移除 0 个异常清单（已隔离），14 个孤儿物品保留在金库
 ```
 - 34 模块 import/export 全匹配、全项目 `node --check` 通过、ContentLog `[Scripting][error]` = **0**、`stop` 正常退出
+
+
+---
+
+## 9. 事故追记：4.13.6 上线后的 `ReferenceError`（2026-09-28）
+
+线上日志：
+```
+[12:11:17 ERROR]: [Scripting] [灯浮市BeatoriniFI] ReferenceError: 'safeParseArray' is not defined
+    at getAchievements (modules/achievements.js:75)
+```
+
+**原因**：4.13.5 给 `achievements.js` 的 `getAchievements()` 接入了 `safeParseArray`，但**漏了 import**。
+玩家进服触发 `getAchievements()` 时才抛错（成就检查因此整条失败）。
+
+**为什么之前的检查没发现**：
+- `node --check` 只验证语法，不解析标识符
+- `.bds-test/ci.mjs`（import/export 匹配）只验证"**导入的**名字在目标模块里存在"，不验证"**使用的**名字是否被导入"
+- 无头测试服只跑启动路径，`getAchievements` 属于玩家进服路径，测不到
+- 早期那个 `lint-undefined.mjs` 只扫**全大写**标识符（常量风格），camelCase 漏网
+
+**处理**：
+1. 补上 `import { safeParseArray } from "../lib/json.js";`
+2. 新增 `tools/lint-symbols.js`——真正做符号解析（剥离注释/字符串/正则，收集 import/声明/参数/catch/循环变量，再比对所有引用），并做回归验证：临时删掉该 import 时能准确报出 `✗ achievements.js: 可能未定义 → safeParseArray`
+3. 纳入 HANDOVER 的"提交前必跑三项检查"（`node --check` → `lint-symbols.js` → 本地测试服实测）

@@ -1,3 +1,4 @@
+import { safeParseArray } from "../lib/json.js";
 import { world, system } from "@minecraft/server";
 import { ACHIEVEMENT_PREFIX } from "./config.js";
 
