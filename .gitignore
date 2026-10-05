@@ -20,3 +20,12 @@ Desktop.ini
 # Minecraft 常见临时文件
 *_history
 *.tmp
+
+# 本地 API 参考副本（@minecraft/* 与 Microsoft Learn 文档，第三方内容不随仓库分发）
+docs/
+# 调试导出（含线上数据，禁止入库）
+tools/out_listings.txt
+*.dump
+
+# Language server / 编辑器缓存
+.lse-cache/
