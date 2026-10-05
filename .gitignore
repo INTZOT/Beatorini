@@ -29,3 +29,6 @@ tools/out_listings.txt
 
 # Language server / 编辑器缓存
 .lse-cache/
+
+# 打包产物（.mcpack 由 tools/build-mcpack.sh 生成，走 GitHub Releases 分发）
+dist/

@@ -48,6 +48,10 @@ echo "目标：$DST"
 
 # 1) 清单 + 数据目录（目录不带尾斜杠：整体复制成 $DST/entities、$DST/scripts）
 rsync "${RSYNC_FLAGS[@]}" "$SRC/manifest.json" "$DST/"
+# 图标（缺失时游戏内显示默认图标；由 tools/gen-pack-icon.js 生成）
+if [ -f "$SRC/pack_icon.png" ]; then
+  rsync "${RSYNC_FLAGS[@]}" "$SRC/pack_icon.png" "$DST/"
+fi
 rsync "${RSYNC_FLAGS[@]}" "$SRC/entities" "$SRC/scripts" "$DST/"
 
 # 2) 维度定义（dimensions/*.json，决定空岛建筑上限；由 tools/gen-island-dimensions.js 生成）

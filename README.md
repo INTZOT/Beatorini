@@ -72,7 +72,22 @@ tools/local-server/deploy-pack.sh <世界名>  # 把行为包 rsync 进指定世
 ./sync-to-game.sh /path/to/world/behavior_packs/Beatorini
 ```
 
-### 4. 提交前必跑（HANDOVER 第 9 条）
+### 4. 打包成 `.mcpack`（可直接导入游戏）
+
+```bash
+tools/build-mcpack.sh              # 版本号取自 package.json，输出 dist/BeatoriniFI-v<版本>.mcpack
+node tools/gen-pack-icon.js        # 需要重新生成包图标时
+```
+
+`.mcpack` 要求 `manifest.json` 位于压缩包**根目录**，且只含游戏需要的内容
+（`manifest.json` / `pack_icon.png` / `entities` / `scripts` / `dimensions` / `structures/*.mcstructure`）；
+打包脚本会自检这两点，并把 `tools/`、`docs/`、`node_modules/`、`*.geo.json` 等一律排除。
+
+> 导入注意：本包使用 **beta 版 Script API 模块**（`2.11.0-beta` / `2.3.0-beta`），
+> 因此目标世界的实验性选项里必须开启 **Beta APIs**，且游戏版本需与 `manifest.json`
+> 的 `min_engine_version` 匹配（当前 1.26.51）。
+
+### 5. 提交前必跑（HANDOVER 第 9 条）
 
 ```bash
 node --check scripts/main.js            # 1. 语法
